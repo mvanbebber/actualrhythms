@@ -15,7 +15,7 @@
     4: ['Sixteenths', 'Sixteenth-note grid, dotted eighth + sixteenth.'],
     5: ['Advanced', 'Triplets, 32nds, sixteenth syncopation.'],
   };
-  const GENRES = { folk: 'Folk tunes', chorale: 'Bach chorales', classical: 'Classical', ragtime: 'Ragtime', jazz: 'Jazz solos', popular: 'Popular songs' };
+  const GENRES = { folk: 'Folk tunes', chorale: 'Bach chorales', classical: 'Classical', ragtime: 'Ragtime', jazz: 'Jazz solos', popular: 'Popular songs', latin: 'Latin rhythms' };
   const GRADE = { perfect: 0.035, good: 0.075 };
   const REPEATS = 2; // every excerpt is played through twice (written with a repeat sign)
   const WORSE = { perfect: 0, good: 1, off: 2, miss: 3 };
@@ -893,7 +893,7 @@
       <div class="eyebrow">Where this rhythm comes from</div>
       <h3>${esc(title)}${composer ? ` <em>${esc(composer)}</em>` : ''}</h3>
       ${where ? `<p class="where">${where}</p>` : ''}
-      <p>${part}${bars}${from}${note ? ` · ${esc(note)}` : ''}</p>
+      <p>${[part.replace(/, $/, ''), bars].filter(Boolean).join(', ')}${from}${note ? ` · ${esc(note)}` : ''}</p>
       <p>${occurs}</p>
       ${others ? `<div class="eyebrow">Also found in</div><ul>${others}</ul>` : ''}${more}
     </div>`;
@@ -1053,7 +1053,7 @@
   // ---------- settings component ----------
   const PRIMARY_METERS = ['2/4', '3/4', '4/4', '6/8'].filter((m) => METER_ORDER.includes(m));
   const MORE_METERS = METER_ORDER.filter((m) => !PRIMARY_METERS.includes(m));
-  const GENRE_SHORT = { folk: 'Folk', chorale: 'Bach', classical: 'Classical', ragtime: 'Ragtime', jazz: 'Jazz', popular: 'Songs' };
+  const GENRE_SHORT = { folk: 'Folk', chorale: 'Bach', classical: 'Classical', ragtime: 'Ragtime', jazz: 'Jazz', popular: 'Songs', latin: 'Latin' };
 
   function toggleGroup(el, entries, key, multi, repick = true) {
     entries.forEach(({ val, label, aria }) => {

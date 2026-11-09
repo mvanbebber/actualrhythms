@@ -47,6 +47,7 @@ COLLECTIONS = {
     'wjd': ('Weimar Jazz Database', 'jazz'),
     'joplinrags': ("Scott Joplin's rags (Sapp edition)", 'ragtime'),
     'openewld': ('OpenEWLD lead sheets', 'popular'),
+    'latin': ('Standard Latin rhythms', 'latin'),
 }
 
 METERS = {'2/4', '3/4', '4/4', '2/2', '3/8', '6/8', '9/8', '12/8', '3/2', '6/4'}
@@ -450,6 +451,11 @@ def main():
                 found.extend(res)
         print(f'extra sources: {len(found) - n0} windows from {len(extra_jobs)} files', file=sys.stderr)
 
+    import latin  # standard Latin patterns, written out in tools/latin.py
+    lw = latin.latin_windows()
+    found.extend(lw)
+    print(f'latin: {len(lw)} windows from {len(latin.PATTERNS)} patterns', file=sys.stderr)
+
     if args.wjd:
         import wjd
         n0 = len(found)
@@ -484,7 +490,7 @@ def main():
         if s['folder'] == 'essenFolksong':  # drop source page references: '(273), S. 583', '(Band 1), S. 11'
             s['title'] = re.sub(r'\s*\((?:Band \d+|[\d\-]+[a-z]?)\)', '', s['title'])
             s['title'] = re.sub(r',\s*S\.\s*\d+\w*\s*$', '', s['title']).strip() or s['title']
-        if s['title'].islower():
+        if s['title'].islower() and s['folder'] != 'latin':
             s['title'] = string.capwords(s['title'])
         if s['folder'] in COMPOSERS:
             s['composer'] = COMPOSERS[s['folder']]
@@ -508,7 +514,10 @@ def main():
                          'n': 0, 'o': []}
         u = uniq[key]
         u['n'] += 1
-        if len(u['o']) < args.max_sources and all(o[0] != occ[0] for o in u['o']):
+        if s['folder'] == 'latin':
+            # a named Latin pattern always keeps its place (the Latin filter depends on it)
+            u['o'] = [occ] + [o for o in u['o'] if o[0] != occ[0]][:args.max_sources - 1]
+        elif len(u['o']) < args.max_sources and all(o[0] != occ[0] for o in u['o']):
             u['o'].append(occ)
 
     items = []

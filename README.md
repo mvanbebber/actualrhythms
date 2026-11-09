@@ -22,6 +22,7 @@ Every excerpt plays twice (it's written with a repeat sign). **→ / N** loads t
 | Classical | Mozart, Haydn, Beethoven, Schubert, Schumann, Chopin, Handel, Corelli, Monteverdi and others: every part |
 | Ragtime | All 47 of Scott Joplin's rags (right hand), from Craig Stuart Sapp's digital edition (CC BY-NC-SA 4.0) |
 | Popular songs | All 568 lead sheets in [OpenEWLD](https://github.com/00sapo/OpenEWLD): Tin Pan Alley, Broadway, standards, traditional songs. Songs that are not US public domain (first performed after 1930) are included with the site owner's permission; without `--openewld-all` the build keeps only US public domain |
+| Latin rhythms | 12 standard patterns written out in `tools/latin.py`, each with its origin and a short description: son and rumba clave (3-2 and 2-3), bossa nova clave, tresillo, habanera, cinquillo, cha-cha-chá, tumbao, the 6/8 bell and 6/8 clave. Unlike the rest of the corpus these are the patterns as conventionally notated, not excerpts of single recordings |
 | Jazz solos | 456 transcribed improvisations from the [Weimar Jazz Database](https://jazzomat.hfm-weimar.de/) (Armstrong, Parker, Rollins, Coltrane, Davis, Brecker and others), via the MIT-licensed [jazzodata](https://github.com/klausfrieler/jazzodata) export |
 
 For multi-voice staves (piano, divisi) it reads the busiest voice in each bar. For each line it keeps complete bars only, splits them into 2- and 4-bar windows, drops windows that start in the middle of a tied note or use tuplets other than triplets, and deduplicates identical rhythms (keeping up to five sources each, with their pitches). Each rhythm is then graded:
@@ -97,6 +98,7 @@ To add your own music, drop MusicXML / ABC / kern files into a folder and add it
 - `tools/wjd.py` – jazz solo extraction
 - `tools/extra_sources.py` – Joplin edition and OpenEWLD loaders (with the US public-domain filter)
 - `tools/origins.py` – country of origin and dated label for every source
+- `tools/latin.py` – the standard Latin rhythm patterns
 - `tools/build_corpus.py` – corpus extraction
 
 ## Hosting

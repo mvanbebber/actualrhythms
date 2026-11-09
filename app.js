@@ -172,6 +172,8 @@
         }
         stave.setBegBarType(VF.Barline.type.NONE).setEndBarType(VF.Barline.type.NONE);
         stave.setContext(ctx).draw();
+        // leave room after a barline so the first note (and any tie into it) doesn't crowd it
+        if (k > 0 || r > 0) stave.setNoteStartX(stave.getNoteStartX() + 14);
         // one-line staves have zero-height barlines, so draw our own
         const ly = stave.getYForLine(0);
         const last = mIdx === item.b - 1;

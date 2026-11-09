@@ -1,0 +1,219 @@
+<meta charset="utf-8">
+<title>Repertoire Rhythms</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Rhythm sight-reading practice using only rhythms cut from real, public-domain music.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: practice desk on the left (score sheet, transport, tap pad, result), settings rail on the right; one column on phones. */
+:root {
+  --paper: #f7f8f5;
+  --sheet: #ffffff;
+  --ink: #1b2230;
+  --ink-soft: #566070;
+  --rule: #d9ddd6;
+  --brass: #9a5c0c;
+  --brass-soft: #f3e6d0;
+  --perfect: #23824f;
+  --good: #2c6cb0;
+  --off: #c26a12;
+  --miss: #c23a32;
+  --font-display: "Libre Caslon Text", Georgia, "Times New Roman", serif;
+  --font-body: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #12151b; --sheet: #1a1f28; --ink: #e9e7e1; --ink-soft: #a3a9b3; --rule: #2e3542;
+    --brass: #e2a54b; --brass-soft: #3a2c17; --perfect: #4cc283; --good: #6aa7ec; --off: #eb9a45; --miss: #f0766c;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #12151b; --sheet: #1a1f28; --ink: #e9e7e1; --ink-soft: #a3a9b3; --rule: #2e3542;
+  --brass: #e2a54b; --brass-soft: #3a2c17; --perfect: #4cc283; --good: #6aa7ec; --off: #eb9a45; --miss: #f0766c;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+
+.app { max-width: 1180px; margin: 0 auto; padding-block: 20px 40px; display: grid; gap: 20px; }
+header.top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 20px; }
+.brand h1 { font-family: var(--font-display); font-weight: 400; font-size: clamp(26px, 4vw, 34px); margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+.brand h1 i { color: var(--brass); }
+.brand p { margin: 2px 0 0; color: var(--ink-soft); max-width: 62ch; }
+.session { font-family: var(--font-mono); font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; align-items: start; }
+@media (max-width: 880px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+
+.desk { display: grid; gap: 14px; min-width: 0; }
+.sheet { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius); padding: 14px 14px 10px; min-width: 0; }
+.sheet-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--ink-soft); }
+.meta-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip-static { font-family: var(--font-mono); font-size: 12px; padding: 1px 8px; border-radius: 99px; border: 1px solid var(--rule); color: var(--ink-soft); }
+.chip-static.lvl { border-color: var(--brass); color: var(--brass); }
+.score-wrap { position: relative; margin-top: 6px; min-height: 120px; }
+#score svg { display: block; max-width: 100%; height: auto; }
+#playhead { position: absolute; width: 2px; background: var(--brass); border-radius: 2px; pointer-events: none; opacity: 0.85; }
+#countin { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; font-family: var(--font-display); font-size: 64px; color: var(--brass); text-shadow: 0 0 12px var(--sheet); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink-soft); margin-top: 4px; }
+.legend span::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: 0; background: var(--c); }
+
+.transport { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn { border: 1px solid var(--rule); background: var(--sheet); padding: 8px 14px; border-radius: 8px; cursor: pointer; font-weight: 500; display: inline-flex; gap: 8px; align-items: center; }
+.btn:hover { border-color: var(--ink-soft); }
+.btn.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.btn.primary:hover { opacity: 0.9; }
+.btn kbd { font-family: var(--font-mono); font-size: 11px; opacity: 0.65; border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.spacer { flex: 1; }
+.tempo-inline { font-family: var(--font-mono); font-size: 13px; color: var(--ink-soft); }
+
+.pad { user-select: none; -webkit-user-select: none; touch-action: manipulation; border: 1.5px dashed var(--rule); border-radius: var(--radius); background: var(--sheet); min-height: 96px; display: grid; place-items: center; text-align: center; cursor: pointer; color: var(--ink-soft); transition: background 60ms; padding: 12px; }
+.pad strong { display: block; color: var(--ink); font-size: 16px; }
+.pad.flash { background: var(--brass-soft); border-color: var(--brass); }
+
+.result { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius); padding: 16px; display: grid; gap: 14px; }
+.result-top { display: flex; flex-wrap: wrap; gap: 16px 28px; align-items: center; }
+.bigscore { font-family: var(--font-display); font-size: 52px; line-height: 1; font-variant-numeric: tabular-nums; }
+.bigscore small { font-size: 20px; color: var(--ink-soft); }
+.verdict { color: var(--ink-soft); font-size: 14px; max-width: 40ch; }
+.counts { display: flex; gap: 6px; flex-wrap: wrap; }
+.count { font-family: var(--font-mono); font-size: 12px; padding: 2px 9px; border-radius: 99px; color: var(--c); border: 1px solid var(--c); font-variant-numeric: tabular-nums; }
+.source { border-top: 1px solid var(--rule); padding-top: 12px; display: grid; gap: 6px; }
+.source .eyebrow { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-soft); }
+.source h3 { font-family: var(--font-display); font-weight: 400; font-size: 20px; margin: 0; text-wrap: balance; }
+.source h3 em { color: var(--ink-soft); font-size: 15px; }
+.source p { margin: 0; color: var(--ink-soft); font-size: 13px; }
+.source ul { margin: 2px 0 0; padding-left: 18px; font-size: 13px; color: var(--ink-soft); }
+
+aside.settings { background: var(--sheet); border: 1px solid var(--rule); border-radius: var(--radius); padding: 16px; display: grid; gap: 18px; position: sticky; top: max(12px, env(safe-area-inset-top, 0px)); }
+@media (max-width: 880px) { aside.settings { position: static; } }
+fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: 8px; min-width: 0; }
+legend, .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-soft); padding: 0; font-weight: 600; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--rule); background: transparent; border-radius: 99px; padding: 3px 11px; cursor: pointer; font-size: 13px; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.chip small { opacity: 0.6; font-family: var(--font-mono); font-size: 11px; margin-left: 3px; }
+.tempo-row { display: flex; align-items: center; gap: 10px; }
+.tempo-row input[type=range] { flex: 1; accent-color: var(--brass); min-width: 0; }
+.tempo-row output { font-family: var(--font-mono); font-variant-numeric: tabular-nums; min-width: 4.5ch; text-align: right; }
+.toggle { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+.toggle input { accent-color: var(--brass); width: 16px; height: 16px; }
+.help { font-size: 12px; color: var(--ink-soft); margin: 0; }
+.pool { font-family: var(--font-mono); font-size: 12px; color: var(--ink-soft); border-top: 1px solid var(--rule); padding-top: 10px; }
+.lat-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.lat-row input { width: 5.5em; padding: 4px 6px; border: 1px solid var(--rule); border-radius: 6px; background: var(--paper); font-family: var(--font-mono); }
+.calib { font-size: 13px; color: var(--brass); }
+.empty { padding: 30px 10px; text-align: center; color: var(--ink-soft); }
+footer { font-size: 12px; color: var(--ink-soft); max-width: 80ch; }
+@media (prefers-reduced-motion: reduce) { .pad { transition: none; } }
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <h1>Repertoire <i>Rhythms</i></h1>
+      <p>Sight-read rhythms cut from real music: folk tunes, Bach chorales, rags and string quartets. Tap along, then find out where the rhythm came from.</p>
+    </div>
+    <div class="session" id="session"></div>
+  </header>
+
+  <div class="layout">
+    <main class="desk">
+      <section class="sheet" aria-label="Rhythm to read">
+        <div class="sheet-head">
+          <div class="meta-chips" id="metaChips"></div>
+          <span id="excerptNote"></span>
+        </div>
+        <div class="score-wrap">
+          <div id="score"></div>
+          <div id="playhead" hidden></div>
+          <div id="countin" hidden></div>
+        </div>
+        <div class="legend" id="legend" hidden>
+          <span style="--c: var(--perfect)">Within 35 ms</span>
+          <span style="--c: var(--good)">Within 75 ms</span>
+          <span style="--c: var(--off)">Loose</span>
+          <span style="--c: var(--miss)">Missed</span>
+          <span style="--c: var(--ink-soft)">Tick marks are your taps</span>
+        </div>
+      </section>
+
+      <div class="transport">
+        <button class="btn primary" id="btnPlay">Start <kbd>Enter</kbd></button>
+        <button class="btn" id="btnListen">Listen <kbd>L</kbd></button>
+        <button class="btn" id="btnNext">Next rhythm <kbd>N</kbd></button>
+        <span class="spacer"></span>
+        <span class="tempo-inline" id="tempoInline"></span>
+      </div>
+
+      <div class="pad" id="pad" role="button" tabindex="0" aria-label="Tap pad">
+        <div><strong id="padTitle">Tap here, or press Space</strong><span id="padSub">Start gives you one bar of count-in clicks. Tap each note's attack; hold nothing, skip rests.</span></div>
+      </div>
+
+      <section class="result" id="result" hidden aria-live="polite"></section>
+    </main>
+
+    <aside class="settings" aria-label="Practice settings">
+      <fieldset>
+        <legend>Tempo (beats per minute)</legend>
+        <div class="tempo-row">
+          <input type="range" id="tempo" min="40" max="200" step="2" value="80">
+          <output id="tempoOut" for="tempo">80</output>
+        </div>
+        <p class="help">In 6/8, 9/8 and 12/8 the beat is the dotted quarter.</p>
+      </fieldset>
+      <fieldset>
+        <legend>Difficulty</legend>
+        <div class="chips" id="levels"></div>
+        <p class="help" id="levelHelp"></p>
+      </fieldset>
+      <fieldset>
+        <legend>Length</legend>
+        <div class="chips" id="lengths"></div>
+      </fieldset>
+      <fieldset>
+        <legend>Time signature</legend>
+        <div class="chips" id="meters"></div>
+      </fieldset>
+      <fieldset>
+        <legend>Repertoire</legend>
+        <div class="chips" id="genres"></div>
+      </fieldset>
+      <fieldset>
+        <legend>Playback</legend>
+        <label class="toggle"><input type="checkbox" id="metro" checked> Metronome during the rhythm</label>
+        <label class="toggle"><input type="checkbox" id="hideSource" checked> Hide the source until I've played it</label>
+      </fieldset>
+      <fieldset>
+        <legend>Timing calibration</legend>
+        <div class="lat-row">
+          <input type="number" id="latency" value="0" step="5" min="-300" max="300" aria-label="Latency offset in milliseconds"> <span class="help">ms</span>
+          <button class="btn" id="btnCalib" type="button">Calibrate</button>
+        </div>
+        <p class="help">Bluetooth audio adds delay. Calibrate plays 12 clicks; tap with them and the offset is measured for you.</p>
+        <div class="calib" id="calibMsg" aria-live="polite"></div>
+      </fieldset>
+      <div class="pool" id="pool"></div>
+    </aside>
+  </div>
+
+  <footer>
+    Rhythms are extracted from public-domain scores in the music21 corpus (Essen folksong collection, O'Neill's and Ryan's fiddle-tune collections, the Nottingham folk tunes, Bach chorales, Joplin, Mozart, Haydn, Beethoven and others). Every excerpt is a real passage; none are generated. Notation by VexFlow.
+  </footer>
+</div>
+
+<script src="vendor/vexflow.js"></script>
+<script src="data/rhythms.js"></script>
+<script src="app.js"></script>

@@ -538,6 +538,21 @@ def main():
         json.dump(data, f, separators=(',', ':'), ensure_ascii=False)
         f.write(';\n')
 
+    # Stamp index.html's link to the data with a fingerprint of its contents, so browsers can't
+    # keep using a cached older corpus after a rebuild.
+    import hashlib
+    index = os.path.join(os.path.dirname(os.path.abspath(args.out)), '..', 'index.html')
+    if os.path.exists(index) and os.path.basename(args.out) == 'rhythms.js':
+        with open(args.out, 'rb') as fh:
+            digest = hashlib.sha1(fh.read()).hexdigest()[:10]
+        with open(index, encoding='utf-8') as fh:
+            html = fh.read()
+        html2 = re.sub(r'data/rhythms\.js(\?v=[^"]*)?"', f'data/rhythms.js?v={digest}"', html)
+        if html2 != html:
+            with open(index, 'w', encoding='utf-8') as fh:
+                fh.write(html2)
+        print(f'index.html now loads data/rhythms.js?v={digest}', file=sys.stderr)
+
     from collections import Counter
     print(f'{len(found)} windows -> {len(items)} unique rhythms from {len(sources)} pieces', file=sys.stderr)
     print('by level:', sorted(Counter((u["b"], u["l"]) for u in items).items()), file=sys.stderr)

@@ -371,7 +371,13 @@
     if (ac.state !== 'running' && ac.state !== 'closed') ac.resume().catch(() => {});
     return ac;
   }
+  // A silent, looping <audio> element switches iOS into its media-playback audio session,
+  // which is what lets Web Audio sound when the phone is in Silent mode. It has to be started
+  // from a completed tap or click (iOS ignores play() from a touch-down), so keep trying until
+  // it is really playing.
+  const IS_IOS = /iP(hone|ad|od)/.test(navigator.platform) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   let silentLoop = null;
+  let silentLoopPlaying = false;
   function silentWavURL() {
     const n = 4000; // half a second of 8 kHz, 8-bit silence
     const buf = new ArrayBuffer(44 + n); const v = new DataView(buf);
@@ -383,28 +389,39 @@
     for (let i = 0; i < n; i++) v.setUint8(44 + i, 128);
     return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
   }
-  // Runs inside every user gesture (capture phase) until audio is running, so the
-  // gesture that presses Start or taps the pad is also the one that unlocks sound.
-  function unlockAudio() {
+  function startSilentLoop() {
+    if (!IS_IOS || silentLoopPlaying || document.hidden) return;
+    if (!silentLoop) {
+      silentLoop = document.createElement('audio');
+      silentLoop.src = silentWavURL();
+      silentLoop.loop = true;
+      silentLoop.preload = 'auto';
+      silentLoop.setAttribute('playsinline', '');
+      silentLoop.setAttribute('x-webkit-airplay', 'deny');
+      silentLoop.addEventListener('pause', () => { silentLoopPlaying = false; });
+    }
+    const pr = silentLoop.play();
+    if (pr && pr.then) pr.then(() => { silentLoopPlaying = true; }, () => { silentLoopPlaying = false; });
+    else silentLoopPlaying = true;
+  }
+  // every gesture: make sure the context is running; completed taps/clicks also start the loop
+  let primed = false;
+  function onGesture(e) {
     preferPlaybackSession();
     const c = audio();
-    if (!unlockAudio.primed) {
-      unlockAudio.primed = true;
+    if (!primed) {
+      primed = true;
       try { // a one-sample silent buffer started within the gesture (older iOS unlock)
         const src = c.createBufferSource(); src.buffer = c.createBuffer(1, 1, 22050); src.connect(c.destination); src.start(0);
-      } catch (e) { /* ignore */ }
+      } catch (err) { /* ignore */ }
     }
-    const isIOS = /iP(hone|ad|od)/.test(navigator.platform) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    if (isIOS && !navigator.audioSession && !silentLoop) {
-      silentLoop = new Audio(silentWavURL());
-      silentLoop.loop = true; silentLoop.setAttribute('playsinline', ''); silentLoop.setAttribute('x-webkit-airplay', 'deny');
-      silentLoop.play().catch(() => { silentLoop = null; });
-    }
+    if (e.type === 'touchend' || e.type === 'click' || e.type === 'keydown') startSilentLoop();
   }
-  ['pointerdown', 'touchend', 'click', 'keydown'].forEach((t) => document.addEventListener(t, () => {
-    if (!ac || ac.state !== 'running' || !unlockAudio.primed) unlockAudio();
-  }, { capture: true, passive: true }));
-  document.addEventListener('visibilitychange', () => { if (!document.hidden && ac && ac.state !== 'running') ac.resume().catch(() => {}); });
+  ['pointerdown', 'touchend', 'click', 'keydown'].forEach((t) => document.addEventListener(t, onGesture, { capture: true, passive: true }));
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { if (silentLoop) silentLoop.pause(); return; } // don't hold the audio session in the background
+    if (ac && ac.state !== 'running') ac.resume().catch(() => {});
+  });
   let scheduled = [];
   let audioGen = 0; // bumped on stop so late-loading notes don't sound
   function click(t, accent, quiet) {
@@ -422,6 +439,16 @@
     const LAYERS = [6, 8, 10, 13];
     const NAMES = { 0: 'C', 3: 'Ds', 6: 'Fs', 9: 'A' };
     const cache = new Map();
+    // Decode with an offline context so preloading never creates the real AudioContext:
+    // on iOS that must first happen inside a tap, after the page has switched to media playback.
+    let dctx = null;
+    const decoder = () => {
+      if (!dctx) {
+        const Off = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+        dctx = Off ? new Off(2, 1, 44100) : audio();
+      }
+      return dctx;
+    };
     let master = null;
     const sampleFor = (midi) => {
       const m = Math.max(21, Math.min(108, midi));
@@ -434,7 +461,7 @@
     function load(url) {
       if (!cache.has(url)) {
         const p = fetch(url).then((r) => { if (!r.ok) throw new Error(url + ' ' + r.status); return r.arrayBuffer(); })
-          .then((buf) => new Promise((res, rej) => audio().decodeAudioData(buf, res, rej)));
+          .then((buf) => new Promise((res, rej) => decoder().decodeAudioData(buf, res, rej)));
         p.catch(() => cache.delete(url));
         cache.set(url, p);
       }

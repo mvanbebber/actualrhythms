@@ -403,3 +403,11 @@ html[data-layout="wide"] #meters button, html[data-layout="wide"] #metersMore bu
 html[data-layout="wide"] .pills button.more .icon { width: 14px; height: 14px; }
 .seg button[aria-pressed="true"] + button[aria-pressed="true"] { border-left-color: rgba(255, 255, 255, 0.4); }
 html[data-layout="wide"] .pills button.more .icon { display: none; }
+
+/* touch devices (iPhone, iPad): bigger settings icon; credits live in Settings → Advanced instead of the footer */
+@media (pointer: coarse) {
+  .settings-btn .icon { width: 28px; height: 28px; }
+  html[data-layout="phone"] .settings-btn, html[data-layout="phone-landscape"] .settings-btn { width: 48px; height: 48px; }
+  .credits { display: none; }
+}
+@media (pointer: fine) { .credits-help { display: none; } }

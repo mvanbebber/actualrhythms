@@ -23,7 +23,7 @@
   // touch devices (phones, iPads, including iPads with a keyboard or trackpad) get the locked, no-scroll page
   if (navigator.maxTouchPoints > 0 || 'ontouchstart' in window) document.documentElement.dataset.touch = '';
 </script>
-<link rel="stylesheet" href="styles.css?v=11">
+<link rel="stylesheet" href="styles.css?v=15">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
@@ -176,15 +176,39 @@
             </div>
           </div>
         </details>
-        <p class="pool" id="pool"></p>
+        <button class="pool" id="pool" type="button"></button>
       </div>
     </aside>
   </div>
 
 </div>
 
+<div class="corpus" id="corpus" role="dialog" aria-modal="true" aria-labelledby="corpusTitle" hidden>
+  <div class="corpus-panel">
+    <div class="corpus-head">
+      <h2 id="corpusTitle">The corpus</h2>
+      <button class="btn btn-icon btn-quiet" id="corpusClose" type="button" aria-label="Close the corpus"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
+    </div>
+    <div class="corpus-tools">
+      <input type="search" id="corpusSearch" placeholder="Search title, composer, country, year" aria-label="Search the corpus" autocomplete="off">
+      <select id="corpusSort" aria-label="Sort">
+        <option value="common">Most common first</option>
+        <option value="easy">Easiest first</option>
+        <option value="hard">Hardest first</option>
+        <option value="title">Title A–Z</option>
+      </select>
+      <div class="switch-row corpus-only">
+        <span id="corpusOnlyLabel">Only rhythms matching my settings</span>
+        <button class="switch" id="corpusOnly" type="button" role="switch" aria-checked="false" aria-labelledby="corpusOnlyLabel"></button>
+      </div>
+    </div>
+    <p class="corpus-count" id="corpusCount" aria-live="polite"></p>
+    <div class="corpus-scroll" id="corpusScroll"><div class="corpus-spacer" id="corpusSpacer"></div></div>
+  </div>
+</div>
+
 <script src="vendor/vexflow.js"></script>
 <script src="data/rhythms.js"></script>
-<script src="app.js?v=13"></script>
+<script src="app.js?v=15"></script>
 </body>
 </html>

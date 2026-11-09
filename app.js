@@ -186,6 +186,68 @@
     requestAnimationFrame(() => { if (phase === 'idle') render(); else pendingRender = true; });
   }
 
+  // Draw one bar (stave, barline or end-repeat, notes, beams, triplets) on a one-line staff.
+  // k is the bar's position within its row. Used by the score and the corpus thumbnails.
+  function drawBar(ctx, item, mi, flat, mIdx, k, x, y, w, grades) {
+    const stave = new VF.Stave(x, y, w, { num_lines: 1, spacing_between_lines_px: 10, space_above_staff_ln: 4 });
+    if (mIdx === 0) {
+      const ts = new VF.TimeSignature(item.m);
+      ts.topLine -= 2; ts.bottomLine -= 2; // centre the digits on a one-line staff
+      stave.addModifier(ts);
+    }
+    stave.setBegBarType(VF.Barline.type.NONE).setEndBarType(VF.Barline.type.NONE);
+    stave.setContext(ctx).draw();
+    // leave room after a barline so the first note (and any tie into it) doesn't crowd it
+    if (mIdx > 0) stave.setNoteStartX(stave.getNoteStartX() + (k > 0 ? 14 : 6));
+    // one-line staves have zero-height barlines, so draw our own
+    const ly = stave.getYForLine(0);
+    const last = mIdx === item.b - 1;
+    ctx.save(); ctx.setLineWidth(1.2);
+    if (last) {
+      // end-repeat sign: dots, thin line, thick line
+      ctx.beginPath(); ctx.moveTo(x + w - 8, ly - 15); ctx.lineTo(x + w - 8, ly + 15); ctx.stroke();
+      ctx.fillRect(x + w - 4.5, ly - 15, 4, 30);
+      [-6, 6].forEach((dy) => { ctx.beginPath(); ctx.arc(x + w - 13, ly + dy, 2, 0, Math.PI * 2); ctx.fill(); });
+    } else {
+      ctx.beginPath(); ctx.moveTo(x + w - 0.5, ly - 15); ctx.lineTo(x + w - 0.5, ly + 15); ctx.stroke();
+    }
+    ctx.restore();
+
+    const meas = measures(item)[mIdx];
+    const evs = flat.events.filter((q) => q.mi === mIdx);
+    const notes = meas.map((e, i) => {
+      const ev = evs[i];
+      const base = e[1].replace(/d/g, '');
+      const dots = (e[1].match(/d/g) || []).length;
+      const n = new VF.StaveNote({
+        keys: [ev.rest ? (base === 'w' ? 'a/5' : 'f/5') : 'f/5'], duration: base + (ev.rest ? 'r' : ''), dots, stem_direction: 1,
+        clef: 'percussion', auto_stem: false, align_center: ev.rest && meas.length === 1,
+      });
+      for (let d = 0; d < dots; d++) VF.Dot.buildAndAttach([n], { all: true });
+      const g = grades && grades[ev.idx];
+      if (g) { const c = GRADE_COLOR[g.grade]; n.setStyle({ fillStyle: c, strokeStyle: c }); }
+      ev.vf = n;
+      return n;
+    });
+    const tuplets = [];
+    let tStart = -1;
+    meas.forEach((e, i) => {
+      if (e[2] & FLAG.TSTART) tStart = i;
+      if (e[2] & FLAG.TSTOP && tStart >= 0) {
+        tuplets.push(new VF.Tuplet(notes.slice(tStart, i + 1), { num_notes: 3, notes_occupied: 2, ratioed: false }));
+        tStart = -1;
+      }
+    });
+    const voice = new VF.Voice({ num_beats: mi.num, beat_value: mi.den }).setMode(VF.Voice.Mode.SOFT);
+    voice.addTickables(notes);
+    const beams = VF.Beam.generateBeams(notes, { groups: VF.Beam.getDefaultBeamGroups(item.m), stem_direction: 1, beam_rests: false });
+    new VF.Formatter().joinVoices([voice]).formatToStave([voice], stave);
+    voice.draw(ctx, stave);
+    beams.forEach((b) => b.setContext(ctx).draw());
+    tuplets.forEach((t) => t.setContext(ctx).draw());
+    return { notes, evs, last, meas };
+  }
+
   function render() {
     const host = $('score');
     host.innerHTML = '';
@@ -233,62 +295,7 @@
       idxs.forEach((mIdx, k) => {
         rowOfMeasure[mIdx] = r;
         const w = plan.min[mIdx] * squeeze + spare * (plan.min[mIdx] * squeeze / sum);
-        const stave = new VF.Stave(x, y, w, { num_lines: 1, spacing_between_lines_px: 10, space_above_staff_ln: 4 });
-        if (mIdx === 0) {
-          const ts = new VF.TimeSignature(item.m);
-          ts.topLine -= 2; ts.bottomLine -= 2; // centre the digits on a one-line staff
-          stave.addModifier(ts);
-        }
-        stave.setBegBarType(VF.Barline.type.NONE).setEndBarType(VF.Barline.type.NONE);
-        stave.setContext(ctx).draw();
-        // leave room after a barline so the first note (and any tie into it) doesn't crowd it
-        if (mIdx > 0) stave.setNoteStartX(stave.getNoteStartX() + (k > 0 ? 14 : 6));
-        // one-line staves have zero-height barlines, so draw our own
-        const ly = stave.getYForLine(0);
-        const last = mIdx === item.b - 1;
-        ctx.save(); ctx.setLineWidth(1.2);
-        if (last) {
-          // end-repeat sign: dots, thin line, thick line
-          ctx.beginPath(); ctx.moveTo(x + w - 8, ly - 15); ctx.lineTo(x + w - 8, ly + 15); ctx.stroke();
-          ctx.fillRect(x + w - 4.5, ly - 15, 4, 30);
-          [-6, 6].forEach((dy) => { ctx.beginPath(); ctx.arc(x + w - 13, ly + dy, 2, 0, Math.PI * 2); ctx.fill(); });
-        } else {
-          ctx.beginPath(); ctx.moveTo(x + w - 0.5, ly - 15); ctx.lineTo(x + w - 0.5, ly + 15); ctx.stroke();
-        }
-        ctx.restore();
-
-        const meas = measures(item)[mIdx];
-        const evs = flat.events.filter((q) => q.mi === mIdx);
-        const notes = meas.map((e, i) => {
-          const ev = evs[i];
-          const base = e[1].replace(/d/g, '');
-          const dots = (e[1].match(/d/g) || []).length;
-          const n = new VF.StaveNote({
-            keys: [ev.rest ? (base === 'w' ? 'a/5' : 'f/5') : 'f/5'], duration: base + (ev.rest ? 'r' : ''), dots, stem_direction: 1,
-            clef: 'percussion', auto_stem: false, align_center: ev.rest && meas.length === 1,
-          });
-          for (let d = 0; d < dots; d++) VF.Dot.buildAndAttach([n], { all: true });
-          const g = grades && grades[ev.idx];
-          if (g) { const c = GRADE_COLOR[g.grade]; n.setStyle({ fillStyle: c, strokeStyle: c }); }
-          ev.vf = n;
-          return n;
-        });
-        const tuplets = [];
-        let tStart = -1;
-        meas.forEach((e, i) => {
-          if (e[2] & FLAG.TSTART) tStart = i;
-          if (e[2] & FLAG.TSTOP && tStart >= 0) {
-            tuplets.push(new VF.Tuplet(notes.slice(tStart, i + 1), { num_notes: 3, notes_occupied: 2, ratioed: false }));
-            tStart = -1;
-          }
-        });
-        const voice = new VF.Voice({ num_beats: mi.num, beat_value: mi.den }).setMode(VF.Voice.Mode.SOFT);
-        voice.addTickables(notes);
-        const beams = VF.Beam.generateBeams(notes, { groups: VF.Beam.getDefaultBeamGroups(item.m), stem_direction: 1, beam_rests: false });
-        new VF.Formatter().joinVoices([voice]).formatToStave([voice], stave);
-        voice.draw(ctx, stave);
-        beams.forEach((b) => b.setContext(ctx).draw());
-        tuplets.forEach((t) => t.setContext(ctx).draw());
+        const { notes, evs, last, meas } = drawBar(ctx, item, mi, flat, mIdx, k, x, y, w, grades);
 
         // tick -> x map for the playhead and feedback marks
         const m0 = mIdx * mi.bar;
@@ -1038,11 +1045,11 @@
     const levels = S.levels.slice().sort().join(', ');
     const genres = Object.keys(GENRES).filter((g) => S.genres.includes(g)).map((g) => GENRE_SHORT[g]).join(', ');
     const meters = METER_ORDER.filter((m) => S.meters.includes(m)).join(', ');
-    $('pool').textContent = `${n.toLocaleString()} of ${DATA.rhythms.length.toLocaleString()} real rhythms match: level ${levels}; ${meters}; ${genres}; ${S.bars} bars.`;
+    $('pool').innerHTML = `${n.toLocaleString()} of ${DATA.rhythms.length.toLocaleString()} real rhythms match: level ${levels}; ${meters}; ${genres}; ${S.bars} bars.<span class="browse">Browse every rhythm in the corpus</span>`;
     const note = $('poolNote');
     note.textContent = `${n.toLocaleString()} matching`;
     note.title = `Level ${levels} · ${meters} · ${genres}`;
-    note.setAttribute('aria-label', `${n} matching rhythms. Filters: level ${levels}; ${meters}; ${genres}.` + (root.dataset.layout === 'wide' ? '' : ' Open settings.'));
+    note.setAttribute('aria-label', `${n} matching rhythms. Filters: level ${levels}; ${meters}; ${genres}. Browse them.`);
   }
 
   function buildSettings() {
@@ -1123,8 +1130,8 @@
     if (restoreFocus && lastFocus && lastFocus.isConnected && !lastFocus.closest('#settings')) lastFocus.focus();
     else if (restoreFocus) $('btnSettings').focus();
   }
-  function trapFocus(e) {
-    const items = [...$('settings').querySelectorAll('button:not([disabled]), input:not([disabled]), summary')]
+  function trapFocus(e, box = $('settings')) {
+    const items = [...box.querySelectorAll('button:not([disabled]), input:not([disabled]), select, summary')]
       .filter((el) => {
         if (!el.getClientRects().length || el.closest('[hidden]')) return false;
         // content of a closed <details> can still have boxes (content-visibility), but can't take focus
@@ -1148,6 +1155,181 @@
     if (!current) render();
   }
 
+  // ---------- corpus browser: every rhythm, searchable; tap one to practise it ----------
+  const CORPUS_ROW = 112;
+  let corpusOpen = false;
+  let corpusList = [];
+  let corpusOpener = null;
+  let thumbW = 0;
+  const rowEls = new Map();
+  const thumbCache = new Map();
+
+  function haystack(item) {
+    if (!item._hay) {
+      item._hay = item.o.map((o) => {
+        const src = DATA.sources[o[0]];
+        return [src[0], src[1], src[3], src[4], src[5], DATA.collections[src[2]].label, o[1]].join(' ');
+      }).join(' ').toLowerCase();
+    }
+    return item._hay;
+  }
+
+  // a one-row notation thumbnail, drawn with the same code as the score
+  function thumbSVG(item, W) {
+    const hit = thumbCache.get(item);
+    if (hit && hit.W === W) return hit.svg;
+    let svg = '';
+    try {
+      const host = document.createElement('div');
+      const mi = meterInfo(item.m);
+      const flat = flatten(item);
+      const ms = measures(item);
+      const s = 0.72; const Wl = W / s;
+      const min = ms.map((m, i) => measureMinWidth(m) + (i === 0 ? 36 : 0) + (i === ms.length - 1 ? 16 : 0));
+      const sum = min.reduce((acc, v) => acc + v, 0);
+      const squeeze = Math.min(1, (Wl - 8) / sum);
+      const spare = Math.max(0, Wl - 8 - sum * squeeze);
+      const renderer = new VF.Renderer(host, VF.Renderer.Backends.SVG);
+      renderer.resize(W, Math.ceil(72 * s));
+      const ctx = renderer.getContext();
+      ctx.scale(s, s); ctx.setFillStyle(INK); ctx.setStrokeStyle(INK);
+      let x = 4;
+      ms.forEach((m, i) => {
+        const w = min[i] * squeeze + spare * (min[i] / sum);
+        drawBar(ctx, item, mi, flat, i, i, x, 10, w, null);
+        x += w;
+      });
+      flat.events.forEach((ev, i) => {
+        if (!(ev.flags & FLAG.TIE) || i + 1 >= flat.events.length) return;
+        new VF.StaveTie({ first_note: ev.vf, last_note: flat.events[i + 1].vf, first_indices: [0], last_indices: [0] }).setContext(ctx).draw();
+      });
+      host.querySelector('svg').setAttribute('aria-hidden', 'true');
+      svg = host.innerHTML;
+    } catch (e) { svg = ''; }
+    thumbCache.set(item, { W, svg });
+    if (thumbCache.size > 600) thumbCache.delete(thumbCache.keys().next().value);
+    return svg;
+  }
+
+  function corpusRowHTML(item) {
+    const src = DATA.sources[item.o[0][0]];
+    const where = [src[3], src[4]].filter(Boolean).join(' · ');
+    return `<div class="c-thumb">${thumbSVG(item, thumbW)}</div>
+      <div class="c-meta">
+        <span class="c-chips"><span class="chip">${item.m}</span><span class="chip">Level ${item.l}</span><span class="chip">${item.b} bars</span>${item.n > 1 ? `<span class="c-n">occurs ${item.n}×</span>` : ''}</span>
+        <span class="c-src"><b>${esc(src[0])}</b>${src[1] ? ' · ' + esc(src[1]) : ''}${where ? ' · ' + esc(where) : ''}</span>
+      </div>`;
+  }
+
+  function measureCorpus() {
+    const sc = $('corpusScroll');
+    const wide = sc.clientWidth >= 640;
+    $('corpus').classList.toggle('wide-rows', wide);
+    const w = Math.max(200, Math.floor(wide ? (sc.clientWidth - 32 - 16) * 0.56 : sc.clientWidth - 32));
+    if (w !== thumbW) { thumbW = w; rowEls.forEach((el) => el.remove()); rowEls.clear(); }
+  }
+
+  function renderCorpusRows() {
+    if (!corpusOpen) return;
+    const sc = $('corpusScroll');
+    const first = Math.max(0, Math.floor(sc.scrollTop / CORPUS_ROW) - 3);
+    const last = Math.min(corpusList.length - 1, Math.ceil((sc.scrollTop + sc.clientHeight) / CORPUS_ROW) + 3);
+    for (const [i, el] of rowEls) if (i < first || i > last) { el.remove(); rowEls.delete(i); }
+    for (let i = first; i <= last; i++) {
+      if (rowEls.has(i)) continue;
+      const el = document.createElement('button');
+      el.type = 'button'; el.className = 'c-row'; el.dataset.i = i;
+      el.style.top = (i * CORPUS_ROW) + 'px';
+      el.innerHTML = corpusRowHTML(corpusList[i]);
+      el.setAttribute('aria-label', `Practise: ${el.textContent.replace(/\s+/g, ' ').trim()}`);
+      $('corpusSpacer').appendChild(el);
+      rowEls.set(i, el);
+    }
+  }
+
+  function refreshCorpus() {
+    const q = $('corpusSearch').value.trim().toLowerCase();
+    const only = $('corpusOnly').getAttribute('aria-checked') === 'true';
+    let list = only ? pool() : DATA.rhythms.slice();
+    if (q) { const terms = q.split(/\s+/); list = list.filter((it) => terms.every((t) => haystack(it).includes(t))); }
+    const title = (it) => DATA.sources[it.o[0][0]][0];
+    const cmp = {
+      common: (x, y) => y.n - x.n || x.l - y.l,
+      easy: (x, y) => x.l - y.l || y.n - x.n,
+      hard: (x, y) => y.l - x.l || y.n - x.n,
+      title: (x, y) => title(x).localeCompare(title(y)),
+    }[$('corpusSort').value];
+    list.sort(cmp);
+    corpusList = list;
+    const all = DATA.rhythms.length.toLocaleString();
+    $('corpusCount').textContent = (!only && !q)
+      ? `${all} rhythms in the corpus, each a real passage`
+      : `${list.length.toLocaleString()} ${only ? 'matching ' : ''}rhythm${list.length === 1 ? '' : 's'}`
+        + (q ? ` for “${$('corpusSearch').value.trim()}”` : '') + ` · ${all} in the whole corpus`;
+    $('corpusSpacer').style.height = (list.length * CORPUS_ROW) + 'px';
+    $('corpusSpacer').querySelectorAll('.c-empty').forEach((e) => e.remove());
+    if (!list.length) $('corpusSpacer').insertAdjacentHTML('beforeend', '<p class="c-empty">No rhythms match. Try a different search, or switch off “Only rhythms matching my settings”.</p>');
+    rowEls.forEach((el) => el.remove()); rowEls.clear();
+    $('corpusScroll').scrollTop = 0;
+    renderCorpusRows();
+  }
+
+  function openCorpus(onlyMatching) {
+    if (corpusOpen) return;
+    corpusOpener = document.activeElement;
+    if (settingsOpen) closeSettings(false);
+    if (run) stopRun();
+    corpusOpen = true;
+    $('corpusOnly').setAttribute('aria-checked', String(!!onlyMatching));
+    $('corpus').hidden = false;
+    document.querySelector('.app').inert = true;
+    measureCorpus();
+    refreshCorpus();
+    requestAnimationFrame(() => $('corpusSearch').focus({ preventScroll: true }));
+  }
+  function closeCorpus() {
+    if (!corpusOpen) return;
+    corpusOpen = false;
+    $('corpus').hidden = true;
+    document.querySelector('.app').inert = false;
+    rowEls.forEach((el) => el.remove()); rowEls.clear();
+    const back = corpusOpener && corpusOpener.isConnected && corpusOpener.getClientRects().length ? corpusOpener : $('btnPlay');
+    back.focus({ preventScroll: true });
+  }
+  function practiseItem(item) {
+    const occs = item.o.filter((o) => S.genres.includes(genreOf(o)));
+    const occ = (occs.length ? occs : item.o)[0];
+    if (run) stopRun(true);
+    seen.splice(seenPos + 1);
+    seen.push({ item, occ }); if (seen.length > 200) seen.shift();
+    seenPos = seen.length - 1;
+    show(item, occ);
+  }
+
+  function setupCorpus() {
+    let t = null;
+    $('corpusSearch').addEventListener('input', () => { clearTimeout(t); t = setTimeout(refreshCorpus, 150); });
+    $('corpusSort').addEventListener('change', refreshCorpus);
+    $('corpusOnly').addEventListener('click', () => {
+      $('corpusOnly').setAttribute('aria-checked', String($('corpusOnly').getAttribute('aria-checked') !== 'true'));
+      refreshCorpus();
+    });
+    $('corpusClose').addEventListener('click', closeCorpus);
+    $('corpus').addEventListener('click', (e) => { if (e.target === $('corpus')) closeCorpus(); }); // backdrop
+    let raf = 0;
+    $('corpusScroll').addEventListener('scroll', () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(renderCorpusRows); }, { passive: true });
+    $('corpusSpacer').addEventListener('click', (e) => {
+      const row = e.target.closest('.c-row');
+      if (!row) return;
+      const item = corpusList[Number(row.dataset.i)];
+      closeCorpus();
+      practiseItem(item);
+      setButtons();
+    });
+    window.addEventListener('resize', () => { if (corpusOpen) { measureCorpus(); renderCorpusRows(); } });
+    $('pool').addEventListener('click', () => openCorpus(false));
+  }
+
   // ---------- wiring (runs once) ----------
   function setupUI() {
     buildSettings();
@@ -1161,7 +1343,7 @@
     $('btnSettings').addEventListener('click', openSettings);
     $('btnCloseSettings').addEventListener('click', () => closeSettings());
     $('scrim').addEventListener('click', () => closeSettings());
-    $('poolNote').addEventListener('click', () => { if (isOverlay()) openSettings(); });
+    $('poolNote').addEventListener('click', () => openCorpus(true));
     // single input path for taps: pointerdown (touch, pen, mouse) plus the keyboard handler below
     $('pad').addEventListener('pointerdown', (e) => { if (e.button > 0) return; e.preventDefault(); onTap(e); });
     $('pad').addEventListener('contextmenu', (e) => e.preventDefault());
@@ -1177,6 +1359,10 @@
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (phase === 'calibrating' && tapKey && !tgt.matches('input')) {
         e.preventDefault(); if (!e.repeat) onTap(e); return;
+      }
+      if (corpusOpen) {
+        if (e.key === 'Escape') { e.preventDefault(); closeCorpus(); } else if (e.key === 'Tab') trapFocus(e, $('corpus'));
+        return; // no practice shortcuts while browsing
       }
       if (settingsOpen) {
         if (e.key === 'Escape') { e.preventDefault(); closeSettings(); } else if (e.key === 'Tab') trapFocus(e);
@@ -1219,6 +1405,7 @@
   };
 
   setupUI();
+  setupCorpus();
   updateSession();
   pickNext();
   setButtons();

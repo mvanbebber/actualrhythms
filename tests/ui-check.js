@@ -285,6 +285,51 @@ async function performTaps(p, { lateMs = 0, skipFirst = 0 } = {}) {
     await p.context().close();
   }
 
+  // 5b. corpus browser: opens from the settings summary, lists every rhythm, search/sort/filter, tap to practise
+  for (const [w, h, touch, label] of [[1440, 900, false, 'laptop'], [390, 844, true, 'phone']]) {
+    console.log('corpus browser ' + label);
+    const p = await newPage(browser, base, w, h, touch, { levels: [2], bars: 2 });
+    if (label === 'phone') { await p.click('#btnSettings'); await p.waitForTimeout(300); }
+    await p.click('#pool');
+    await p.waitForSelector('#corpus:not([hidden]) .c-row');
+    const total = await p.evaluate(() => window.RHYTHM_DATA.rhythms.length);
+    const count = await p.textContent('#corpusCount');
+    check(count.startsWith(total.toLocaleString('en-US') + ' rhythms in the corpus'), `corpus should list all ${total} rhythms: "${count}"`);
+    const rows = await p.$$eval('.c-row', (r) => r.length);
+    check(rows > 3 && rows < 60, `only visible rows should be in the DOM (${rows})`);
+    check(await p.$$eval('.c-row .c-thumb svg', (s) => s.length) === rows, 'every row needs a notation thumbnail');
+    check(await p.evaluate(() => document.querySelector('.app').inert), 'page behind the corpus should be inert');
+    await p.$eval('#corpusScroll', (e) => { e.scrollTop = 112 * 5000; });
+    await p.waitForTimeout(200);
+    check(await p.$eval('.c-row', (r) => Number(r.dataset.i) > 4000), 'scrolling deep should render deep rows');
+    await p.fill('#corpusSearch', 'rollins');
+    await p.waitForTimeout(400);
+    const hits = await p.textContent('#corpusCount');
+    check(/^[\d,]+ rhythms? for/.test(hits) && !hits.startsWith('0 '), `search should find Sonny Rollins solos: "${hits}"`);
+    await p.click('#corpusOnly');
+    await p.waitForTimeout(300);
+    check(/matching/.test(await p.textContent('#corpusCount')), 'matching-only switch');
+    await p.fill('#corpusSearch', '');
+    await p.click('#corpusOnly');
+    await p.selectOption('#corpusSort', 'hard');
+    await p.waitForTimeout(300);
+    check(await p.$eval('.c-row .chip:nth-child(2)', (c) => c.textContent) === 'Level 5', 'hardest-first sort');
+    await p.screenshot({ path: path.join(OUT, `corpus-${label}.png`) });
+    const pick = await p.$eval('.c-row', (r) => r.textContent.replace(/\s+/g, ' '));
+    await p.click('.c-row');
+    await p.waitForTimeout(300);
+    check(await p.isHidden('#corpus'), 'choosing a rhythm should close the corpus');
+    check(await p.evaluate(() => window.actualRhythms.current.item.l) === 5, 'the chosen rhythm should load for practice');
+    await p.click('#poolNote');
+    await p.waitForSelector('#corpus:not([hidden])');
+    check(/matching/.test(await p.textContent('#corpusCount')), 'the matching note should open the corpus filtered to matching rhythms');
+    await p.keyboard.press('Escape');
+    check(await p.isHidden('#corpus'), 'Escape should close the corpus');
+    check(await p.evaluate(() => document.activeElement.id) === 'poolNote', 'focus should return to what opened the corpus');
+    check(p.errors.length === 0, 'page errors: ' + p.errors.join(' | '));
+    await p.context().close();
+  }
+
   // 6. touch devices: the page is locked to the screen (nothing to scroll); inner panels scroll instead
   for (const dev of ['iPhone 15 Pro', 'iPhone 15 Pro landscape', 'iPad Pro 11', 'iPad Pro 11 landscape']) {
     for (const bars of [2, 4]) {

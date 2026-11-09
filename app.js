@@ -15,7 +15,7 @@
     4: ['Sixteenths', 'Sixteenth-note grid, dotted eighth + sixteenth.'],
     5: ['Advanced', 'Triplets, 32nds, sixteenth syncopation.'],
   };
-  const GENRES = { folk: 'Folk tunes', chorale: 'Bach chorales', classical: 'Classical', ragtime: 'Ragtime', jazz: 'Jazz solos' };
+  const GENRES = { folk: 'Folk tunes', chorale: 'Bach chorales', classical: 'Classical', ragtime: 'Ragtime', jazz: 'Jazz solos', popular: 'Popular songs (to 1930)' };
   const GRADE = { perfect: 0.035, good: 0.075 };
   const REPEATS = 2; // every excerpt is played through twice (written with a repeat sign)
   const WORSE = { perfect: 0, good: 1, off: 2, miss: 3 };
@@ -54,6 +54,13 @@
   S.tapSound = !!S.tapSoundBy[S.output];
   const calibStale = () => latencyMs() !== 0 && S.calibClick[S.output] !== !!S.tapSound;
   const OUTPUT_NAME = { speaker: 'speaker or wired headphones', bluetooth: 'Bluetooth headphones' };
+  // repertoire groups added since the settings were saved start switched on
+  if (!Array.isArray(S.knownGenres)) S.knownGenres = ['folk', 'chorale', 'classical', 'ragtime', 'jazz'];
+  Object.keys(GENRES).forEach((g) => {
+    if (!S.knownGenres.includes(g)) { S.knownGenres.push(g); if (Array.isArray(S.genres) && !S.genres.includes(g)) S.genres.push(g); }
+  });
+  S.genres = S.genres.filter((g) => GENRES[g]);
+  if (!S.genres.length) S.genres = Object.keys(GENRES);
   const save = () => store.set('settings', S);
 
   const meterCounts = {};
@@ -1046,7 +1053,7 @@
   // ---------- settings component ----------
   const PRIMARY_METERS = ['2/4', '3/4', '4/4', '6/8'].filter((m) => METER_ORDER.includes(m));
   const MORE_METERS = METER_ORDER.filter((m) => !PRIMARY_METERS.includes(m));
-  const GENRE_SHORT = { folk: 'Folk', chorale: 'Bach', classical: 'Classical', ragtime: 'Ragtime', jazz: 'Jazz' };
+  const GENRE_SHORT = { folk: 'Folk', chorale: 'Bach', classical: 'Classical', ragtime: 'Ragtime', jazz: 'Jazz', popular: 'Songs' };
 
   function toggleGroup(el, entries, key, multi, repick = true) {
     entries.forEach(({ val, label, aria }) => {

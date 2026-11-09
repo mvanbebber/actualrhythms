@@ -128,8 +128,8 @@ def origin_and_date(src):
     if folder == 'essenFolksong':
         date = src.get('s_year') and f"published {src['s_year']}" or ESSEN_FILE_DATES.get(src.get('file'))
         return essen_origin(src.get('origin_raw')), date
-    if folder == 'wjd':
-        return None, src.get('date')
+    if folder in ('wjd', 'joplinrags', 'openewld'):  # metadata supplied by the source itself
+        return src.get('origin'), src.get('date')
     if folder in COLLECTIONS:
         return COLLECTIONS[folder]
     if folder == 'miscFolk':  # a few tunes carry a dated publisher, e.g. 'Preston (1780)'

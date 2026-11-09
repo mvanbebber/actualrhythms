@@ -45,6 +45,8 @@ COLLECTIONS = {
     'johnson_j_r': ('J. Rosamond Johnson', 'classical'),
     'leadSheet': ('Lead sheets', 'classical'),
     'wjd': ('Weimar Jazz Database', 'jazz'),
+    'joplinrags': ("Scott Joplin's rags (Sapp edition)", 'ragtime'),
+    'openewld': ('OpenEWLD lead sheets', 'popular'),
 }
 
 METERS = {'2/4', '3/4', '4/4', '2/2', '3/8', '6/8', '9/8', '12/8', '3/2', '6/4'}
@@ -217,7 +219,7 @@ def iter_scores(path):
 
 def parts_of(score, folder):
     parts = list(score.parts) if score.parts else [score]
-    if folder == 'joplin':
+    if folder in ('joplin', 'joplinrags'):
         parts = parts[:1]  # right hand only
     out = []
     for i, p in enumerate(parts):
@@ -248,7 +250,8 @@ def abc_source_years(path):
 
 
 def process_file(args):
-    path, folder = args
+    path, folder = args[0], args[1]
+    meta = args[2] if len(args) > 2 else None
     results = []
     try:
         scores = list(iter_scores(path))
@@ -259,8 +262,10 @@ def process_file(args):
     for s in scores:
         try:
             title, composer = score_title(s, path, folder)
+            if meta:
+                title, composer = meta['title'], meta['composer']
             md = s.metadata
-            extra = {'file': fname,
+            extra = {'file': fname, 'origin': (meta or {}).get('origin'), 'date': (meta or {}).get('date'),
                      'origin_raw': clean_title(md.localeOfComposition, folder) if md is not None and md.localeOfComposition else None,
                      's_year': s_years.get(str(md.number)) if md is not None and md.number is not None else None}
             for part, pname in parts_of(s, folder):
@@ -390,6 +395,10 @@ def main():
     ap.add_argument('--max-sources', type=int, default=3)
     ap.add_argument('--cache', default=os.path.join(os.path.dirname(__file__), '.windows-cache.pkl'),
                     help='parsed windows are cached here; delete it to re-parse the corpus')
+    ap.add_argument('--joplin', metavar='DIR',
+                    help='clone of https://github.com/craigsapp/joplin (CC BY-NC-SA 4.0); adds all of Joplin\'s rags')
+    ap.add_argument('--openewld', metavar='DIR',
+                    help='clone of https://github.com/00sapo/OpenEWLD; adds US-public-domain popular songs')
     ap.add_argument('--wjd', metavar='DIR',
                     help="jazzodata's data/ folder (git clone https://github.com/klausfrieler/jazzodata); adds jazz solos")
     args = ap.parse_args()
@@ -422,6 +431,22 @@ def main():
                     print(f'  {i}/{len(jobs)} files, {len(found)} windows, {time.time()-t0:.0f}s', file=sys.stderr)
         with open(args.cache, 'wb') as f:
             pickle.dump(found, f)
+
+    extra_jobs = []
+    if args.joplin or args.openewld:
+        import extra_sources
+        if args.joplin:
+            extra_jobs += list(extra_sources.joplin_jobs(args.joplin))
+            found = [w for w in found if w['src']['folder'] != 'joplin']  # the same Maple Leaf Rag, better edition
+        if args.openewld:
+            extra_jobs += list(extra_sources.openewld_jobs(args.openewld))
+            print('openewld: kept %d US-public-domain songs, skipped %d' % extra_sources.openewld_jobs.counts, file=sys.stderr)
+    if extra_jobs:
+        n0 = len(found)
+        with Pool(args.jobs) as pool:
+            for res in pool.imap_unordered(process_file, extra_jobs, chunksize=2):
+                found.extend(res)
+        print(f'extra sources: {len(found) - n0} windows from {len(extra_jobs)} files', file=sys.stderr)
 
     if args.wjd:
         import wjd

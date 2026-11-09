@@ -21,6 +21,7 @@ Every excerpt plays twice (it's written with a repeat sign). **→ / N** loads t
 | Bach chorales | Soprano and bass lines of ~370 chorales |
 | Classical | Mozart, Haydn, Beethoven, Schubert, Schumann, Chopin, Handel, Corelli, Monteverdi and others: every part |
 | Ragtime | Joplin, *Maple Leaf Rag* (right hand) |
+| Popular songs (to 1930) | 367 lead sheets from [OpenEWLD](https://github.com/00sapo/OpenEWLD): Tin Pan Alley, Broadway, early standards, traditional songs. Only US public domain: first performed in 1930 or earlier, traditional, or undated with all writers dead by 1930 |
 | Jazz solos | 456 transcribed improvisations from the [Weimar Jazz Database](https://jazzomat.hfm-weimar.de/) (Armstrong, Parker, Rollins, Coltrane, Davis, Brecker and others), via the MIT-licensed [jazzodata](https://github.com/klausfrieler/jazzodata) export |
 
 For multi-voice staves (piano, divisi) it reads the busiest voice in each bar. For each line it keeps complete bars only, splits them into 2- and 4-bar windows, drops windows that start in the middle of a tied note or use tuplets other than triplets, and deduplicates identical rhythms (keeping up to five sources each, with their pitches). Each rhythm is then graded:
@@ -67,8 +68,14 @@ git clone --depth 1 https://github.com/klausfrieler/jazzodata /tmp/jazzodata
 ```
 
 ```bash
-python3 tools/build_corpus.py --wjd /tmp/jazzodata/data
+git clone --depth 1 https://github.com/00sapo/OpenEWLD /tmp/OpenEWLD
 ```
+
+```bash
+python3 tools/build_corpus.py --wjd /tmp/jazzodata/data --openewld /tmp/OpenEWLD
+```
+
+Optionally add `--joplin /path/to/clone` of [craigsapp/joplin](https://github.com/craigsapp/joplin) for all 47 of Joplin's rags (ragtime goes from about 40 rhythms to about 1,500). That digital edition is licensed CC BY-NC-SA 4.0, so a build that includes it must stay non-commercial and share the rhythm data under the same licence.
 
 Jazz solos are spelled into notation by `tools/wjd.py`: the database gives each note's bar, beat and subdivision; notes are held to the next attack (or to their transcribed length at phrase ends), split at beat boundaries with ties, and beats subdivided in 3 or 6 become triplets. Swing eighths are written straight, as on any jazz chart.
 
@@ -84,6 +91,8 @@ To add your own music, drop MusicXML / ABC / kern files into a folder and add it
 - `vendor/vexflow.js` – VexFlow 4.2.3 (MIT)
 - `audio/piano/` – Salamander Grand Piano V3 by Alexander Holm (CC BY 3.0), MP3 encoding from [@audio-samples](https://github.com/darosh/samples-piano-mp3) (MIT): velocity layers 6, 8, 10 and 13 plus key-release samples
 - `tools/wjd.py` – jazz solo extraction
+- `tools/extra_sources.py` – Joplin edition and OpenEWLD loaders (with the US public-domain filter)
+- `tools/origins.py` – country of origin and dated label for every source
 - `tools/build_corpus.py` – corpus extraction
 
 ## Hosting

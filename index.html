@@ -23,7 +23,7 @@
   // touch devices (phones, iPads, including iPads with a keyboard or trackpad) get the locked, no-scroll page
   if (navigator.maxTouchPoints > 0 || 'ontouchstart' in window) document.documentElement.dataset.touch = '';
 </script>
-<link rel="stylesheet" href="styles.css?v=15">
+<link rel="stylesheet" href="styles.css?v=18">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
@@ -163,7 +163,7 @@
             </div>
             <div class="calib">
               <h3>Timing calibration</h3>
-              <p class="help">Calibrate plays 16 clicks; tap along with the last 12 and the offset is measured for whatever you're listening on (see Listening on).</p>
+              <p class="help">Calibrate plays 16 clicks; tap along with the last 12, just as you would in practice, and the offset is measured for whatever you're listening on (see Listening on). Recalibrate if you switch tap clicks on or off.</p>
               <div class="calib-row">
                 <label for="latency">Offset</label>
                 <input id="latency" type="number" step="5" min="-300" max="500" inputmode="numeric"> <span class="help">ms <span id="latencyFor"></span></span>
@@ -171,6 +171,7 @@
               </div>
               <button class="calib-pad" id="calibPad" type="button" hidden>Tap with the clicks</button>
               <p class="calib-msg" id="calibMsg" aria-live="polite"></p>
+              <p class="calib-warn" id="calibWarn"></p>
             </div>
             <div class="help-block">
               <h3>Tempo</h3>
@@ -219,6 +220,6 @@
 
 <script src="vendor/vexflow.js"></script>
 <script src="data/rhythms.js"></script>
-<script src="app.js?v=17"></script>
+<script src="app.js?v=18"></script>
 </body>
 </html>

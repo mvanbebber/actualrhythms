@@ -504,3 +504,6 @@ html[data-layout="phone-landscape"] .tempo-read input { width: 3ch; }
 .corpus.wide-rows .c-row { grid-template-rows: none; grid-template-columns: minmax(0, 56%) minmax(0, 1fr); align-items: center; gap: var(--s4); }
 .corpus.wide-rows .c-src { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .c-empty { padding: var(--s5) var(--s4); color: var(--muted); }
+
+.calib-warn { margin: 0; font-size: 13px; color: var(--off); font-weight: 500; }
+.calib-warn:empty { display: none; }

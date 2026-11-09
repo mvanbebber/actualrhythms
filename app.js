@@ -45,6 +45,11 @@
   if (S.output !== 'speaker' && S.output !== 'bluetooth') S.output = 'speaker';
   delete S.latency;
   const latencyMs = () => Number(S.offsets[S.output]) || 0;
+  // Was each offset measured with tap clicks on? It matters: with clicks on you line up your
+  // (delayed) click with the (equally delayed) metronome; with them off you line up your touch.
+  // Calibrations before this existed never played tap clicks.
+  if (!S.calibClick || typeof S.calibClick !== 'object') S.calibClick = { speaker: false, bluetooth: false };
+  const calibStale = () => latencyMs() !== 0 && S.calibClick[S.output] !== !!S.tapSound;
   const OUTPUT_NAME = { speaker: 'speaker or wired headphones', bluetooth: 'Bluetooth headphones' };
   const save = () => store.set('settings', S);
 
@@ -783,7 +788,7 @@
   }
 
   function onTap(ev) {
-    if (run && run.mode === 'play') tapSound(); // first, before any other work
+    if ((run && run.mode === 'play') || phase === 'calibrating') tapSound(); // first, before any other work
     const heard = eventAudioTime(ev);
     flashPad(ev && ev.currentTarget);
     if (phase === 'calibrating') { calib.taps.push(heard); return; }
@@ -889,7 +894,12 @@
     const ms = (x) => Math.round(x * 1000);
     let verdict;
     if (R.cnt.miss === R.onsets.length) verdict = 'No taps landed near the notes. Tap the pad or press Space on each attack.';
-    else if (Math.abs(R.mean) > 0.03) verdict = `You were ${ms(Math.abs(R.mean))} ms ${R.mean < 0 ? 'early (rushing)' : 'late (dragging)'} on average. If that is steady across attempts, calibrate in Advanced settings.`;
+    else if (Math.abs(R.mean) > 0.03) {
+      verdict = `You were ${ms(Math.abs(R.mean))} ms ${R.mean < 0 ? 'early (rushing)' : 'late (dragging)'} on average. `
+        + (calibStale()
+          ? `Your ${OUTPUT_NAME[S.output]} offset was measured with tap clicks ${S.tapSound ? 'off' : 'on'}, so it doesn't fit how you're playing now: recalibrate in Advanced settings.`
+          : 'If that is steady across attempts, recalibrate in Advanced settings.');
+    }
     else verdict = `Centered on the beat; your spread was ±${ms(R.sd)} ms.`;
     return `<div class="card result">
       <div class="result-top"><div class="bigscore">${R.pct}<small>%</small></div><p class="verdict">${verdict}</p></div>
@@ -944,6 +954,7 @@
         errs.sort((a, b) => a - b);
         const med = errs[Math.floor(errs.length / 2)];
         S.offsets[S.output] = Math.round(med * 1000 / 5) * 5;
+        S.calibClick[S.output] = !!S.tapSound;
         $('latency').value = latencyMs(); save(); syncSettings();
         $('calibMsg').textContent = `Offset for ${OUTPUT_NAME[S.output]} set to ${latencyMs()} ms from ${errs.length} taps.`;
       }
@@ -1078,6 +1089,8 @@
     $('hideSource').setAttribute('aria-checked', String(!!S.hideSource));
     $('latency').value = latencyMs();
     $('latencyFor').textContent = `for ${OUTPUT_NAME[S.output]}`;
+    $('calibWarn').textContent = calibStale()
+      ? `This offset was measured with tap clicks ${S.tapSound ? 'off' : 'on'}. Calibrate again so it matches how you play now.` : '';
     const n = pool().length;
     const levels = S.levels.slice().sort().join(', ');
     const genres = Object.keys(GENRES).filter((g) => S.genres.includes(g)).map((g) => GENRE_SHORT[g]).join(', ');
@@ -1111,7 +1124,7 @@
     }
     toggleGroup($('genres'), Object.keys(GENRES).map((g) => ({ val: g, label: GENRE_SHORT[g], aria: GENRES[g] })), 'genres', true);
     $('metro').addEventListener('click', () => { S.metro = !S.metro; save(); syncSettings(); });
-    $('tapSoundSw').addEventListener('click', () => { S.tapSound = !S.tapSound; save(); syncSettings(); });
+    $('tapSoundSw').addEventListener('click', () => { S.tapSound = !S.tapSound; save(); syncSettings(); if (lastResult) renderOutcome(); });
     $('lowLatencySw').addEventListener('click', () => {
       S.lowLatency = !S.lowLatency; save(); syncSettings();
       if (S.lowLatency) startKeepAlive(); else stopKeepAlive();

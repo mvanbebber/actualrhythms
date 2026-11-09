@@ -21,8 +21,8 @@ TPQ = 24  # ticks per quarter note (covers 32nds and triplets)
 COLLECTIONS = {
     'bach': ('J. S. Bach chorales', 'chorale'),
     'essenFolksong': ('Essen folksong collection', 'folk'),
-    'oneills1850': ("O'Neill's Music of Ireland (1850)", 'folk'),
-    'ryansMammoth': ("Ryan's Mammoth Collection (1883)", 'folk'),
+    'oneills1850': ("O'Neill's Music of Ireland", 'folk'),
+    'ryansMammoth': ("Ryan's Mammoth Collection", 'folk'),
     'nottingham-dataset': ('Nottingham folk tunes', 'folk'),
     'airdsAirs': ("Aird's Airs", 'folk'),
     'miscFolk': ('Folk songs', 'folk'),
@@ -44,7 +44,7 @@ COLLECTIONS = {
     'liliuokalani': ('Liliʻuokalani', 'classical'),
     'johnson_j_r': ('J. Rosamond Johnson', 'classical'),
     'leadSheet': ('Lead sheets', 'classical'),
-    'wjd': ('Weimar Jazz Database (solo transcriptions)', 'jazz'),
+    'wjd': ('Weimar Jazz Database', 'jazz'),
 }
 
 METERS = {'2/4', '3/4', '4/4', '2/2', '3/8', '6/8', '9/8', '12/8', '3/2', '6/4'}
@@ -230,6 +230,23 @@ def parts_of(score, folder):
     return out
 
 
+def abc_source_years(path):
+    """X number -> year printed in that tune's S: (source) line, if any. music21 drops S:."""
+    years, x = {}, None
+    try:
+        with open(path, encoding='latin-1') as f:
+            for line in f:
+                if line.startswith('X:'):
+                    x = line[2:].strip()
+                elif line.startswith('S:') and x is not None:
+                    m = re.search(r'\b(1[5-9]\d\d)\b', line)
+                    if m:
+                        years[x] = m.group(1)
+    except OSError:
+        pass
+    return years
+
+
 def process_file(args):
     path, folder = args
     results = []
@@ -237,11 +254,19 @@ def process_file(args):
         scores = list(iter_scores(path))
     except Exception:
         return results
+    s_years = abc_source_years(path) if path.endswith('.abc') else {}
+    fname = os.path.splitext(os.path.basename(path))[0]
     for s in scores:
         try:
             title, composer = score_title(s, path, folder)
+            md = s.metadata
+            extra = {'file': fname,
+                     'origin_raw': clean_title(md.localeOfComposition, folder) if md is not None and md.localeOfComposition else None,
+                     's_year': s_years.get(str(md.number)) if md is not None and md.number is not None else None}
             for part, pname in parts_of(s, folder):
-                results.extend(extract_part(part, pname, title, composer, folder))
+                for w in extract_part(part, pname, title, composer, folder):
+                    w['src'].update(extra)
+                    results.append(w)
         except Exception:
             continue
     return results
@@ -371,6 +396,7 @@ def main():
     import pickle
 
     from music21 import corpus
+    import origins
     jobs = []
     for p in corpus.getPaths():
         parts = str(p).split(os.sep)
@@ -428,6 +454,9 @@ def main():
         # Essen's DOS encoding leaves 'á' where German has 'ß'
         if s['folder'] == 'essenFolksong' and 'á' in s['title'] and re.search(r'\b(der|die|das|und|ein|ich|sch\w*)\b|sch', s['title'], re.I):
             s['title'] = s['title'].replace('á', 'ß')
+        if s['folder'] == 'essenFolksong':  # drop source page references: '(273), S. 583', '(Band 1), S. 11'
+            s['title'] = re.sub(r'\s*\((?:Band \d+|[\d\-]+[a-z]?)\)', '', s['title'])
+            s['title'] = re.sub(r',\s*S\.\s*\d+\w*\s*$', '', s['title']).strip() or s['title']
         if s['title'].islower():
             s['title'] = string.capwords(s['title'])
         if s['folder'] in COMPOSERS:
@@ -443,7 +472,8 @@ def main():
         skey = (s['title'], s['composer'], s['folder'])
         if skey not in src_index:
             src_index[skey] = len(sources)
-            sources.append([s['title'], s['composer'] or '', s['folder']])
+            origin, date = origins.origin_and_date(s)
+            sources.append([s['title'], s['composer'] or '', s['folder'], origin or '', date or '', s.get('note') or ''])
         occ = [src_index[skey], s['part'], s['bar'], [[e[3] for e in m] for m in w['measures']]]
         if key not in uniq:
             uniq[key] = {'m': w['meter'], 'b': w['bars'],
@@ -470,7 +500,7 @@ def main():
         for o in u['o']:  # pitches as 2-digit hex MIDI numbers, one string per measure
             o[3] = [''.join(f'{p:02x}' for p in m) for m in o[3]]
     data = {
-        'version': 2, 'tpq': TPQ,
+        'version': 3, 'tpq': TPQ,
         'collections': {k: {'label': v[0], 'genre': v[1]} for k, v in COLLECTIONS.items()},
         'sources': sources,
         'rhythms': items,

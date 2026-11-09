@@ -799,17 +799,25 @@
   function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
   const icon = (id, cls) => `<svg class="icon${cls ? ' ' + cls : ''}" aria-hidden="true"><use href="#i-${id}"/></svg>`;
 
+  // collections whose name adds nothing beyond the song's own origin
+  const HIDE_COLLECTION = new Set(['essenFolksong']);
   function sourceInner() {
     const { item, occ } = current;
-    const [title, composer, folder] = DATA.sources[occ[0]];
+    const [title, composer, folder, origin, date, note] = DATA.sources[occ[0]];
     const coll = DATA.collections[folder].label;
     const bar = occ[2];
     const bars = bar != null ? `mm. ${bar}–${bar + item.b - 1}` : '';
     const generic = /^(musicxml part|part\s*\d*|p\d+|instrument\s*\d*)$/i.test((occ[1] || '').trim());
     const part = occ[1] && !generic ? `${esc(occ[1])}, ` : '';
+    const where = [origin, date].filter(Boolean).map(esc).join(' · ');
+    // skip the collection when it adds nothing: Essen (origin says more) or a single-composer folder ('Beethoven')
+    const surname = (composer || '').trim().split(/\s+/).pop();
+    const redundant = HIDE_COLLECTION.has(folder) || (surname && coll.includes(surname));
+    const from = redundant ? '' : `, from ${esc(coll)}`;
     const others = item.o.filter((o) => o !== occ).slice(0, 4).map((o) => {
       const src = DATA.sources[o[0]];
-      return `<li>${esc(src[0])}${src[1] ? ' (' + esc(src[1]) + ')' : ''}, ${esc(DATA.collections[src[2]].label)}</li>`;
+      const place = src[3] || (HIDE_COLLECTION.has(src[2]) ? '' : DATA.collections[src[2]].label);
+      return `<li>${esc(src[0])}${src[1] ? ' (' + esc(src[1]) + ')' : ''}${place ? ', ' + esc(place) : ''}${src[4] ? ', ' + esc(src[4].replace(/^(composed|published|recorded|harmonized) /, '')) : ''}</li>`;
     }).join('');
     const extra = item.n - item.o.length;
     const more = extra > 0 ? `<p>Plus ${extra} more occurrence${extra > 1 ? 's' : ''} across the corpus.</p>` : '';
@@ -817,7 +825,8 @@
     return `<div class="source">
       <div class="eyebrow">Where this rhythm comes from</div>
       <h3>${esc(title)}${composer ? ` <em>${esc(composer)}</em>` : ''}</h3>
-      <p>${part}${bars}, from ${esc(coll)}</p>
+      ${where ? `<p class="where">${where}</p>` : ''}
+      <p>${part}${bars}${from}${note ? ` · ${esc(note)}` : ''}</p>
       <p>${occurs}</p>
       ${others ? `<div class="eyebrow">Also found in</div><ul>${others}</ul>` : ''}${more}
     </div>`;

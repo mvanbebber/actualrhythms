@@ -192,8 +192,11 @@ def wjd_bars(data_dir, flags):
         lst = [(b + 1, f'{beats}/4') + bars[b] if bars[b] else None for b in sorted(bars)]
         year = int(m['recordingyear']) if m['recordingyear'] == m['recordingyear'] else None
         inst = INSTRUMENTS.get(m['instrument'], m['instrument'])
-        part = f"{inst} solo" + (f", {year}" if year else '')
+        part = f"{inst} solo"
         title = m['title'] + (f" ({m['titleaddon']})" if m['titleaddon'] else '')
         if int(m['solopart']) > 1:
             title += f", solo {int(m['solopart'])}"
-        yield {'title': title, 'composer': m['performer'], 'folder': 'wjd', 'part': part[0].upper() + part[1:]}, lst
+        tune_by = (m['composer'] or '').strip()
+        yield {'title': title, 'composer': m['performer'], 'folder': 'wjd', 'part': part[0].upper() + part[1:],
+               'date': f'recorded {year}' if year else None,
+               'note': f'Tune by {tune_by}' if tune_by and tune_by != m['performer'] else None}, lst

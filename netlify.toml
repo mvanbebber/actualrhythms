@@ -14,6 +14,12 @@
   [headers.values]
     Cache-Control = "public, max-age=604800"
 
+# Piano samples never change.
+[[headers]]
+  for = "/audio/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
 # Keep the corpus build tooling out of the public site.
 [[redirects]]
   from = "/tools/*"

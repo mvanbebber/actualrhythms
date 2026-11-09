@@ -44,6 +44,7 @@ COLLECTIONS = {
     'liliuokalani': ('Liliʻuokalani', 'classical'),
     'johnson_j_r': ('J. Rosamond Johnson', 'classical'),
     'leadSheet': ('Lead sheets', 'classical'),
+    'wjd': ('Weimar Jazz Database (solo transcriptions)', 'jazz'),
 }
 
 METERS = {'2/4', '3/4', '4/4', '2/2', '3/8', '6/8', '9/8', '12/8', '3/2', '6/4'}
@@ -266,6 +267,11 @@ def extract_part(part, pname, title, composer, folder):
             bars.append((m.number, msig, evs, tins))
         except Exception:
             bars.append(None)
+    return windows_from_bars(bars, {'title': title, 'composer': composer, 'folder': folder, 'part': pname})
+
+
+def windows_from_bars(bars, src):
+    """Cut a line's bars [(number, meter, events, tie_ins) or None] into 2- and 4-bar windows."""
     out = []
     for size in (2, 4):
         for start in range(0, len(bars) - size + 1, size):
@@ -298,8 +304,7 @@ def extract_part(part, pname, title, composer, folder):
                 continue
             out.append({
                 'meter': msig, 'bars': size, 'measures': measures,
-                'src': {'title': title, 'composer': composer, 'folder': folder,
-                        'part': pname, 'bar': win[0][0]},
+                'src': dict(src, bar=win[0][0]),
             })
     return out
 
@@ -360,6 +365,8 @@ def main():
     ap.add_argument('--max-sources', type=int, default=3)
     ap.add_argument('--cache', default=os.path.join(os.path.dirname(__file__), '.windows-cache.pkl'),
                     help='parsed windows are cached here; delete it to re-parse the corpus')
+    ap.add_argument('--wjd', metavar='DIR',
+                    help="jazzodata's data/ folder (git clone https://github.com/klausfrieler/jazzodata); adds jazz solos")
     args = ap.parse_args()
     import pickle
 
@@ -389,6 +396,21 @@ def main():
                     print(f'  {i}/{len(jobs)} files, {len(found)} windows, {time.time()-t0:.0f}s', file=sys.stderr)
         with open(args.cache, 'wb') as f:
             pickle.dump(found, f)
+
+    if args.wjd:
+        import wjd
+        n0 = len(found)
+        for src, bars in wjd.wjd_bars(args.wjd, (FLAG_REST, FLAG_TIE, FLAG_TRIP)):
+            clean = []
+            for b in bars:
+                try:
+                    if b:
+                        fix_triplets(b[2])
+                    clean.append(b)
+                except Skip:
+                    clean.append(None)
+            found.extend(windows_from_bars(clean, src))
+        print(f'jazz: {len(found) - n0} windows from the Weimar Jazz Database', file=sys.stderr)
 
     # final tidy-up of names (cheap, so it runs on cached windows too)
     COMPOSERS = {'beethoven': 'Ludwig van Beethoven', 'mozart': 'Wolfgang Amadeus Mozart', 'haydn': 'Joseph Haydn',

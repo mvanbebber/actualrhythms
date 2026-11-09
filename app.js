@@ -14,7 +14,7 @@
     4: ['Sixteenths', 'Sixteenth-note grid, dotted eighth + sixteenth.'],
     5: ['Advanced', 'Triplets, 32nds, sixteenth syncopation.'],
   };
-  const GENRES = { folk: 'Folk tunes', chorale: 'Bach chorales', classical: 'Classical', ragtime: 'Ragtime' };
+  const GENRES = { folk: 'Folk tunes', chorale: 'Bach chorales', classical: 'Classical', ragtime: 'Ragtime', jazz: 'Jazz solos' };
   const GRADE = { perfect: 0.035, good: 0.075 };
   const REPEATS = 2; // every excerpt is played through twice (written with a repeat sign)
   const WORSE = { perfect: 0, good: 1, off: 2, miss: 3 };
@@ -24,10 +24,17 @@
     get(k, d) { try { const v = localStorage.getItem('rr.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem('rr.' + k, JSON.stringify(v)); } catch (e) { /* ignore */ } },
   };
+  const SETTINGS_VERSION = 2;
+  const saved = store.get('settings', {});
+  if (!(saved.v >= 2)) {
+    // v2: the source is shown by default, and jazz solos joined the corpus
+    delete saved.hideSource;
+    if (Array.isArray(saved.genres) && !saved.genres.includes('jazz')) saved.genres.push('jazz');
+  }
   const S = Object.assign({
     tempo: 80, levels: [1, 2], bars: 2, meters: ['2/4', '3/4', '4/4', '6/8'],
-    genres: ['folk', 'chorale', 'classical', 'ragtime'], metro: true, hideSource: true, latency: 0,
-  }, store.get('settings', {}));
+    genres: Object.keys(GENRES), metro: true, hideSource: false, latency: 0,
+  }, saved, { v: SETTINGS_VERSION });
   const save = () => store.set('settings', S);
 
   const meterCounts = {};
@@ -113,6 +120,8 @@
     $('legend').hidden = true;
     render();
     updatePool(p.length);
+    if (!S.hideSource) showSourceOnly();
+    piano.prepare(pianoPitches()); // fetch the samples this excerpt needs in the background
   }
 
   // ---------- notation ----------
@@ -310,6 +319,7 @@
     return ac;
   }
   let scheduled = [];
+  let audioGen = 0; // bumped on stop so late-loading notes don't sound
   function click(t, accent, quiet) {
     const c = audio();
     const o = c.createOscillator(); const g = c.createGain();
@@ -319,26 +329,83 @@
     o.connect(g).connect(c.destination); o.start(t); o.stop(t + 0.05);
     scheduled.push(o);
   }
-  function wood(t, dur) {
-    const c = audio();
-    const o = c.createOscillator(); const g = c.createGain(); const f = c.createBiquadFilter();
-    o.type = 'triangle'; o.frequency.value = 620; f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 2;
-    const len = Math.min(0.25, Math.max(0.06, dur * 0.8));
-    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.5, t + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, t + len);
-    o.connect(f).connect(g).connect(c.destination); o.start(t); o.stop(t + len + 0.02);
-    scheduled.push(o);
+  // Salamander Grand Piano V3 (Alexander Holm, CC BY 3.0): 4 of its 16 velocity layers,
+  // sampled every minor third from A0 to C8, plus per-key release (damper) sounds.
+  const piano = (() => {
+    const LAYERS = [6, 8, 10, 13];
+    const NAMES = { 0: 'C', 3: 'Ds', 6: 'Fs', 9: 'A' };
+    const cache = new Map();
+    let master = null;
+    const sampleFor = (midi) => {
+      const m = Math.max(21, Math.min(108, midi));
+      // nearest sampled key (samples are 3 semitones apart, so at most 1 semitone of shift)
+      let best = null;
+      for (let d = 0; d <= 2; d++) for (const c of [m - d, m + d]) if (best === null && c >= 21 && c <= 108 && (c % 12) in NAMES) best = c;
+      return { name: NAMES[best % 12] + (Math.floor(best / 12) - 1), rate: Math.pow(2, (m - best) / 12) };
+    };
+    const layerFor = (vel) => LAYERS[Math.min(LAYERS.length - 1, Math.max(0, Math.floor(vel * LAYERS.length)))];
+    function load(url) {
+      if (!cache.has(url)) {
+        const p = fetch(url).then((r) => { if (!r.ok) throw new Error(url + ' ' + r.status); return r.arrayBuffer(); })
+          .then((buf) => new Promise((res, rej) => audio().decodeAudioData(buf, res, rej)));
+        p.catch(() => cache.delete(url));
+        cache.set(url, p);
+      }
+      return cache.get(url);
+    }
+    const urls = (midi, vel) => {
+      const s = sampleFor(midi);
+      const key = Math.max(1, Math.min(88, midi - 20));
+      return { note: `audio/piano/v${layerFor(vel)}/${s.name}.mp3`, rel: `audio/piano/release/rel${key}.mp3`, rate: s.rate };
+    };
+    function prepare(notes) {
+      return Promise.all(notes.flatMap(({ midi, vel }) => { const u = urls(midi, vel); return [load(u.note), load(u.rel)]; }));
+    }
+    function play(t, dur, midi, vel) {
+      const c = audio();
+      if (!master) { master = c.createGain(); master.gain.value = 0.9; master.connect(c.destination); }
+      const u = urls(midi, vel);
+      const gen = audioGen;
+      Promise.all([load(u.note), load(u.rel)]).then(([buf, rel]) => {
+        if (gen !== audioGen || t < c.currentTime) return; // stopped meanwhile, or arrived too late // arrived too late (only if prepare() was skipped)
+        const src = c.createBufferSource(); const g = c.createGain();
+        src.buffer = buf; src.playbackRate.value = u.rate;
+        const level = 0.75 + 0.35 * vel;
+        const off = t + Math.max(0.06, dur);
+        g.gain.setValueAtTime(level, t);
+        g.gain.setValueAtTime(level, off);
+        g.gain.setTargetAtTime(0, off, 0.07); // damper
+        src.connect(g).connect(master); src.start(t); src.stop(off + 0.6);
+        const rs = c.createBufferSource(); const rg = c.createGain();
+        rs.buffer = rel; rg.gain.value = 0.35 + 0.4 * vel;
+        rs.connect(rg).connect(master); rs.start(off);
+        scheduled.push(src, rs);
+      }).catch(() => { /* a missing sample just stays silent */ });
+    }
+    return { prepare, play };
+  })();
+
+  // metric weight -> loudness. Each weight sits in the middle of one velocity layer
+  // (downbeat, beat, half-beat, the rest), so the layer is fixed and can be preloaded;
+  // humanize adds a little variation inside the layer.
+  function velocityAt(pos, humanize) {
+    const mi = current.mi;
+    const base = pos % mi.bar === 0 ? 0.875 : pos % mi.beat === 0 ? 0.625 : pos % (mi.beat / 2) === 0 ? 0.375 : 0.125;
+    return humanize ? base + (Math.random() - 0.5) * 0.12 : base;
   }
-  function tone(t, dur, midi) {
-    const c = audio();
-    const o = c.createOscillator(); const g = c.createGain();
-    o.type = 'triangle'; o.frequency.value = 440 * Math.pow(2, (midi - 69) / 12);
-    const end = t + Math.max(0.05, dur * 0.95);
-    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.25, t + 0.01);
-    g.gain.setValueAtTime(0.25, Math.max(t + 0.01, end - 0.04)); g.gain.linearRampToValueAtTime(0, end);
-    o.connect(g).connect(c.destination); o.start(t); o.stop(end + 0.02);
-    scheduled.push(o);
+  const LISTEN_MIDI = 72; // Listen plays the rhythm on one note (C5) so it stays a pure rhythm
+  function pianoPitches() {
+    if (!current) return [];
+    const out = [];
+    soundingNotes().forEach((n) => {
+      const vel = velocityAt(n.pos);
+      out.push({ midi: LISTEN_MIDI, vel });
+      if (n.midi) out.push({ midi: n.midi, vel });
+    });
+    return out;
   }
-  function stopAudio() { scheduled.forEach((o) => { try { o.stop(); } catch (e) { /* done */ } }); scheduled = []; }
+
+  function stopAudio() { audioGen++; scheduled.forEach((o) => { try { o.stop(); } catch (e) { /* done */ } }); scheduled = []; }
 
   // audio-clock time at which a DOM event was heard (corrected for output latency)
   function eventAudioTime(ev) {
@@ -357,9 +424,19 @@
 
   function secPerTick() { return 60 / S.tempo / current.mi.beat; }
 
-  function startRun(mode) {
+  let loadingToken = 0;
+  async function startRun(mode) {
     if (!current) return;
     stopRun(true);
+    if (mode !== 'play') {
+      const token = ++loadingToken;
+      const btn = mode === 'melody' ? $('btnMelody') : $('btnListen');
+      const label = btn && btn.innerHTML;
+      if (btn) btn.textContent = 'Loading piano…';
+      try { await piano.prepare(pianoPitches()); } catch (e) { /* play what loaded */ }
+      if (btn && btn.isConnected) btn.innerHTML = label;
+      if (token !== loadingToken || run) return;
+    }
     const c = audio();
     const spt = secPerTick();
     const mi = current.mi;
@@ -374,15 +451,17 @@
     if (mode === 'play' && S.metro) for (let b = 0; b < nBeats; b++) click(t0 + b * beatSec, (b * mi.beat) % mi.bar === 0, true);
     if (mode === 'listen') {
       if (S.metro) for (let b = 0; b < nBeats; b++) click(t0 + b * beatSec, (b * mi.beat) % mi.bar === 0, true);
-      passes((n, t) => wood(t, n.len * spt));
+      passes((n, t) => piano.play(t, n.len * spt, LISTEN_MIDI, velocityAt(n.pos, true)));
     }
     if (mode === 'melody') {
-      passes((n, t) => { if (n.midi) tone(t, n.len * spt, n.midi); });
+      passes((n, t) => { if (n.midi) piano.play(t, n.len * spt, n.midi, velocityAt(n.pos, true)); });
     }
     run = { mode, start, t0, spt, beatSec, countBeats, taps: [], endAt: t0 + total * REPEATS * spt + (mode === 'play' ? beatSec * 0.75 : 0.1) };
     phase = 'countin';
-    $('result').hidden = mode === 'play' ? true : $('result').hidden;
-    if (mode === 'play') { lastResult = null; $('legend').hidden = true; render(); }
+    if (mode === 'play') {
+      lastResult = null; $('legend').hidden = true; render();
+      if (S.hideSource) $('result').hidden = true; else showSourceOnly();
+    }
     setButtons();
     tick();
   }
@@ -656,12 +735,16 @@
     tempo.value = S.tempo; $('tempoOut').textContent = S.tempo;
     tempo.oninput = () => { S.tempo = Number(tempo.value); $('tempoOut').textContent = S.tempo; save(); setButtons(); };
     $('metro').checked = S.metro; $('metro').onchange = (e) => { S.metro = e.target.checked; save(); };
-    $('hideSource').checked = S.hideSource; $('hideSource').onchange = (e) => { S.hideSource = e.target.checked; save(); if (!S.hideSource && !lastResult && current) showSourceOnly(); };
+    $('hideSource').checked = S.hideSource;
+    $('hideSource').onchange = (e) => {
+      S.hideSource = e.target.checked; save();
+      if (!lastResult && current) { if (S.hideSource) $('result').hidden = true; else showSourceOnly(); }
+    };
     $('latency').value = S.latency; $('latency').onchange = (e) => { S.latency = Number(e.target.value) || 0; save(); };
     $('btnCalib').onclick = calibrate;
     $('btnPlay').onclick = () => (run ? stopRun() : startRun('play'));
     $('btnListen').onclick = () => startRun('listen');
-    $('btnNext').onclick = () => { pickNext(); if (!S.hideSource) showSourceOnly(); setButtons(); };
+    $('btnNext').onclick = () => { pickNext(); setButtons(); };
     const pad = $('pad');
     pad.addEventListener('pointerdown', (e) => { e.preventDefault(); onTap(e); });
     document.addEventListener('keydown', (e) => {
@@ -675,7 +758,7 @@
         if (tgt.closest('button')) return;
         e.preventDefault(); run ? stopRun() : startRun('play');
       } else if (e.key === 'Escape') stopRun();
-      else if (phase === 'idle' && e.code === 'KeyN') { pickNext(); if (!S.hideSource) showSourceOnly(); setButtons(); }
+      else if (phase === 'idle' && e.code === 'KeyN') { pickNext(); setButtons(); }
       else if (phase === 'idle' && e.code === 'KeyL') startRun('listen');
     });
     let rt;
@@ -686,12 +769,11 @@
   }
 
   // read-only handle for automated tests
-  window.actualRhythms = { get current() { return current; }, get run() { return run; }, get result() { return lastResult; }, audio };
+  window.actualRhythms = { get current() { return current; }, get run() { return run; }, get result() { return lastResult; }, audio, piano, pianoPitches };
 
   setupUI();
   updateSession();
   pickNext();
-  if (!S.hideSource && current) showSourceOnly();
   setButtons();
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => phase === 'idle' && render());
 })();

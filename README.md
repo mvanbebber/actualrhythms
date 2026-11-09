@@ -9,7 +9,7 @@ A rhythm sight-reading trainer in the spirit of Rhythm Sight Reading Trainer, wi
 3. Tap each note's attack on the pad, or with Space / F / J.
 4. Each note is colored by timing (within 35 ms, within 75 ms, loose, missed); your taps appear as tick marks under the staff. You get a score, your average early/late tendency, and the source of the rhythm.
 
-**Listen** plays the rhythm on a woodblock. **Calibrate** measures your device's audio/input delay (useful with Bluetooth headphones).
+Every excerpt plays twice (it's written with a repeat sign). **Listen** plays the rhythm on a sampled grand piano; **Hear the melody** plays the original passage. **Calibrate** measures your device's audio/input delay (useful with Bluetooth headphones).
 
 ## Where the rhythms come from
 
@@ -21,8 +21,9 @@ A rhythm sight-reading trainer in the spirit of Rhythm Sight Reading Trainer, wi
 | Bach chorales | Soprano and bass lines of ~370 chorales |
 | Classical | Mozart, Haydn, Beethoven, Schubert, Schumann, Chopin, Handel, Corelli, Monteverdi and others: every part |
 | Ragtime | Joplin, *Maple Leaf Rag* (right hand) |
+| Jazz solos | 456 transcribed improvisations from the [Weimar Jazz Database](https://jazzomat.hfm-weimar.de/) (Armstrong, Parker, Rollins, Coltrane, Davis, Brecker and others), via the MIT-licensed [jazzodata](https://github.com/klausfrieler/jazzodata) export |
 
-For each line it keeps complete bars only, splits them into 2- and 4-bar windows, drops windows that start in the middle of a tied note or use tuplets other than triplets, and deduplicates identical rhythms (keeping up to five sources each, with their pitches). Each rhythm is then graded:
+For multi-voice staves (piano, divisi) it reads the busiest voice in each bar. For each line it keeps complete bars only, splits them into 2- and 4-bar windows, drops windows that start in the middle of a tied note or use tuplets other than triplets, and deduplicates identical rhythms (keeping up to five sources each, with their pitches). Each rhythm is then graded:
 
 | Level | Contains |
 |---|---|
@@ -45,12 +46,18 @@ Then open http://localhost:8000.
 To regenerate the rhythm data (takes several minutes):
 
 ```bash
-pip install music21
+pip install music21 pyreadr
 ```
 
 ```bash
-python3 tools/build_corpus.py
+git clone --depth 1 https://github.com/klausfrieler/jazzodata /tmp/jazzodata
 ```
+
+```bash
+python3 tools/build_corpus.py --wjd /tmp/jazzodata/data
+```
+
+Jazz solos are spelled into notation by `tools/wjd.py`: the database gives each note's bar, beat and subdivision; notes are held to the next attack (or to their transcribed length at phrase ends), split at beat boundaries with ties, and beats subdivided in 3 or 6 become triplets. Swing eighths are written straight, as on any jazz chart.
 
 To add your own music, drop MusicXML / ABC / kern files into a folder and add it to `COLLECTIONS` in the script (any format music21 can read works).
 
@@ -60,6 +67,8 @@ To add your own music, drop MusicXML / ABC / kern files into a folder and add it
 - `app.js` – notation (VexFlow), audio (Web Audio), tap capture and scoring
 - `data/rhythms.js` – generated rhythm corpus
 - `vendor/vexflow.js` – VexFlow 4.2.3 (MIT)
+- `audio/piano/` – Salamander Grand Piano V3 by Alexander Holm (CC BY 3.0), MP3 encoding from [@audio-samples](https://github.com/darosh/samples-piano-mp3) (MIT): velocity layers 6, 8, 10 and 13 plus key-release samples
+- `tools/wjd.py` – jazz solo extraction
 - `tools/build_corpus.py` – corpus extraction
 
 ## Hosting

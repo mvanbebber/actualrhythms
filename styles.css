@@ -453,3 +453,6 @@ html[data-layout="phone-landscape"] .transport .btn { padding: 0 10px; gap: 6px;
 html[data-layout="phone-landscape"] .tempo { gap: 4px; padding-left: var(--s2); }
 html[data-layout="phone-landscape"] .tempo-read span { display: none; }
 html[data-layout="phone-landscape"] .tempo-read input { width: 3ch; }
+
+.legend .lg { white-space: nowrap; }
+.legend .lg::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--c); margin: 0 4px 0 2px; vertical-align: 0; }

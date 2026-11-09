@@ -188,7 +188,8 @@ async function performTaps(p, { lateMs = 0, skipFirst = 0 } = {}) {
     check(await p.evaluate(() => document.documentElement.dataset.layout) === 'phone-landscape', 'rotation did not switch layout');
     check(await id() === ex, 'rotation changed the excerpt');
     check(await p.evaluate(() => !!window.actualRhythms.result), 'rotation lost the result');
-    check(await p.$$eval('#score svg circle', (c) => c.length) === res.onsets, 'feedback dots missing after rotation');
+    check(await p.$$eval('#score svg circle', (c) => c.length) === n, 'tap dots missing after rotation');
+    check(await p.$$eval('#score svg g:last-child line', (l) => l.length) === res.onsets, 'note tick marks missing after rotation');
     await p.screenshot({ path: path.join(OUT, 'result-phone-landscape.png') });
     // one tap = one recorded tap (no duplicated listeners after layout changes)
     await p.click('#btnPlay');

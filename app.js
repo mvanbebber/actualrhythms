@@ -34,7 +34,7 @@
   }
   const S = Object.assign({
     tempo: 80, levels: [1, 2], bars: 2, meters: ['2/4', '3/4', '4/4', '6/8'],
-    genres: Object.keys(GENRES), metro: true, hideSource: false, latency: 0,
+    genres: Object.keys(GENRES), metro: true, hideSource: false, latency: 0, tapSound: true, silentMode: true,
   }, saved, { v: SETTINGS_VERSION });
   const save = () => store.set('settings', S);
 
@@ -297,6 +297,12 @@
         rowInfo.segs.push({ t0: m0, t1: m0 + mi.bar, pts });
         x += w;
       });
+      // within a row, a bar's end point leads into the next bar's first note (not the barline),
+      // so a tap a hair before a downbeat is drawn next to that note
+      for (let k = 0; k + 1 < rowInfo.segs.length; k++) {
+        const end = rowInfo.segs[k].pts[rowInfo.segs[k].pts.length - 1];
+        end[1] = rowInfo.segs[k + 1].pts[0][1];
+      }
       rowsInfo.push(rowInfo);
     });
     // ties (may cross rows)
@@ -332,26 +338,30 @@
   }
 
   // dots under each note (one lane per pass, coloured by grade) and tick marks for each tap
+  // Under the staff, one lane per pass: a gray tick where each note falls, and a dot where
+  // each tap landed, centred on the tick's midline and coloured by its timing.
+  const TICK_COLOR = '#9AA19C';
+  const TAP_COLOR = { perfect: GRADE_COLOR.perfect, good: GRADE_COLOR.good, off: GRADE_COLOR.off, extra: GRADE_COLOR.miss };
   function drawTapMarks() {
     const NS = 'http://www.w3.org/2000/svg';
     const g = document.createElementNS(NS, 'g');
     const total = current.flat.total;
-    lastResult.tapTicks.forEach((tk) => {
-      const p = tickToXY(Math.max(0, Math.min(total, tk.tick - tk.pass * total)));
-      if (!p) return;
-      const y = p.row.line + LANE_Y + 3 + tk.pass * LANE_GAP;
-      const l = document.createElementNS(NS, 'line');
-      l.setAttribute('x1', p.x); l.setAttribute('x2', p.x); l.setAttribute('y1', y); l.setAttribute('y2', y + 10);
-      l.setAttribute('stroke', tk.extra ? GRADE_COLOR.miss : '#646B67');
-      l.setAttribute('stroke-width', '2'); l.setAttribute('stroke-linecap', 'round');
-      g.appendChild(l);
-    });
+    const laneY = (row, pass) => row.line + LANE_Y + pass * LANE_GAP;
     lastResult.onsets.forEach((o) => {
       const p = tickToXY(o.tick - o.pass * total);
       if (!p) return;
+      const y = laneY(p.row, o.pass);
+      const l = document.createElementNS(NS, 'line');
+      l.setAttribute('x1', p.x); l.setAttribute('x2', p.x); l.setAttribute('y1', y - 6); l.setAttribute('y2', y + 6);
+      l.setAttribute('stroke', TICK_COLOR); l.setAttribute('stroke-width', '2'); l.setAttribute('stroke-linecap', 'round');
+      g.appendChild(l);
+    });
+    lastResult.tapTicks.forEach((tk) => {
+      const p = tickToXY(Math.max(0, Math.min(total, tk.tick - tk.pass * total)));
+      if (!p) return;
       const c = document.createElementNS(NS, 'circle');
-      c.setAttribute('cx', p.x); c.setAttribute('cy', p.row.line + LANE_Y + o.pass * LANE_GAP); c.setAttribute('r', 3);
-      c.setAttribute('fill', GRADE_COLOR[o.grade]);
+      c.setAttribute('cx', p.x); c.setAttribute('cy', laneY(p.row, tk.pass)); c.setAttribute('r', 3.5);
+      c.setAttribute('fill', TAP_COLOR[tk.grade]); c.setAttribute('stroke', '#FFFFFF'); c.setAttribute('stroke-width', '1');
       g.appendChild(c);
     });
     layout.svg.appendChild(g);
@@ -408,7 +418,7 @@
     return 'data:audio/wav;base64,' + btoa(bin);
   }
   function startSilentLoop() {
-    if (!IS_IOS || silentLoopPlaying || document.hidden) return;
+    if (!IS_IOS || !S.silentMode || silentLoopPlaying || document.hidden) return;
     if (!silentLoop) {
       silentLoop = document.createElement('audio');
       silentLoop.src = silentWavDataURI();
@@ -456,8 +466,9 @@
     if (!el) return;
     const parts = [
       `Audio engine: ${ac ? ac.state : 'not started yet'}${ac ? ` (${ac.sampleRate} Hz)` : ''}`,
+      ac ? `reported delay ${Math.round(((ac.baseLatency || 0) + (ac.outputLatency || 0)) * 1000)} ms` + (ac.outputLatency ? '' : ' (output part not reported)') : null,
       navigator.audioSession ? `iOS audio session: ${navigator.audioSession.type}` : null,
-      IS_IOS ? `Silent-mode workaround: ${silentLoopPlaying ? 'on' : 'off'}` : null,
+      IS_IOS ? `Silent-mode workaround: ${!S.silentMode ? 'switched off' : silentLoopPlaying ? 'on' : 'waiting for a tap'}` : null,
     ].filter(Boolean);
     el.textContent = parts.join(' · ');
   }
@@ -478,14 +489,25 @@
     scheduled.push(o);
   }
   // instant feedback for each tap: a short, dry woodblock-like tick, lower than the metronome
+  let tapBuf = null;
+  function tapBuffer() {
+    if (tapBuf && tapBuf.sampleRate === ac.sampleRate) return tapBuf;
+    const sr = ac.sampleRate; const n = Math.round(sr * 0.045);
+    tapBuf = ac.createBuffer(1, n, sr);
+    const d = tapBuf.getChannelData(0);
+    for (let i = 0; i < n; i++) { // woodblock-like tick: falling tone with a fast decay, peak at sample 0
+      const t = i / sr;
+      const f = 520 + 380 * Math.exp(-t / 0.01);
+      d[i] = 0.55 * Math.sin(2 * Math.PI * f * t + Math.PI / 2) * Math.exp(-t / 0.009);
+    }
+    return tapBuf;
+  }
   function tapSound() {
-    if (!ac || ac.state !== 'running') return;
-    const t = ac.currentTime;
-    const o = ac.createOscillator(); const g = ac.createGain(); const f = ac.createBiquadFilter();
-    o.type = 'triangle'; o.frequency.setValueAtTime(900, t); o.frequency.exponentialRampToValueAtTime(520, t + 0.03);
-    f.type = 'bandpass'; f.frequency.value = 1100; f.Q.value = 1.4;
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.5, t + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
-    o.connect(f).connect(g).connect(ac.destination); o.start(t); o.stop(t + 0.07);
+    if (!S.tapSound || !ac || ac.state !== 'running') return;
+    const src = ac.createBufferSource();
+    src.buffer = tapBuffer();
+    src.connect(ac.destination);
+    src.start(0); // as soon as possible
   }
   // Salamander Grand Piano V3 (Alexander Holm, CC BY 3.0): 4 of its 16 velocity layers,
   // sampled every minor third from A0 to C8, plus per-key release (damper) sounds.
@@ -709,14 +731,15 @@
   }
 
   function onTap(ev) {
+    if (run && run.mode === 'play') tapSound(); // first, before any other work
+    const heard = eventAudioTime(ev);
     flashPad(ev && ev.currentTarget);
-    if (phase === 'calibrating') { calib.taps.push(eventAudioTime(ev)); return; }
+    if (phase === 'calibrating') { calib.taps.push(heard); return; }
     if (!run || run.mode !== 'play') {
       if (phase === 'idle' && current) startRun('play');
       return;
     }
-    run.taps.push(eventAudioTime(ev) - S.latency / 1000);
-    tapSound();
+    run.taps.push(heard - S.latency / 1000);
   }
 
   // ---------- scoring ----------
@@ -739,8 +762,8 @@
     onsets.forEach((o, i) => taps.forEach((t, j) => { const d = t - o.t; if (Math.abs(d) <= o.win) pairs.push([Math.abs(d), i, j, d]); }));
     pairs.sort((a, b) => a[0] - b[0]);
     const usedO = new Set(); const usedT = new Set();
-    const tapPass = {};
-    pairs.forEach(([, i, j, d]) => { if (usedO.has(i) || usedT.has(j)) return; usedO.add(i); usedT.add(j); onsets[i].err = d; tapPass[j] = onsets[i].pass; });
+    const tapPass = {}; const tapOnset = {};
+    pairs.forEach(([, i, j, d]) => { if (usedO.has(i) || usedT.has(j)) return; usedO.add(i); usedT.add(j); onsets[i].err = d; tapPass[j] = onsets[i].pass; tapOnset[j] = i; });
     let pts = 0; const cnt = { perfect: 0, good: 0, off: 0, miss: 0 };
     const errs = [];
     onsets.forEach((o) => {
@@ -763,7 +786,7 @@
     const tapTicks = taps.map((t, j) => {
       const tick = (t - r.t0) / r.spt;
       const pass = j in tapPass ? tapPass[j] : Math.max(0, Math.min(REPEATS - 1, Math.floor(tick / total)));
-      return { tick, pass, extra: !usedT.has(j) };
+      return { tick, pass, extra: !usedT.has(j), grade: j in tapOnset ? onsets[tapOnset[j]].grade : 'extra' };
     });
     lastResult = { onsets, byEvent, tapTicks, cnt, extra, pct, mean, sd };
     history.push({ d: Date.now(), p: pct, l: current.item.l });
@@ -814,9 +837,9 @@
         <span class="count" style="--c:var(--good)">${R.cnt.good} within 75 ms</span>
         <span class="count" style="--c:var(--off)">${R.cnt.off} loose</span>
         <span class="count" style="--c:var(--miss)">${R.cnt.miss} missed</span>
-        <span class="count" style="--c:var(--border-strong)">${R.extra} extra tap${R.extra === 1 ? '' : 's'}</span>
+        <span class="count" style="--c:var(--miss)">${R.extra} extra tap${R.extra === 1 ? '' : 's'}</span>
       </div>
-      <p class="legend">Under the staff: top row is the first time through, bottom row the repeat. Dots are the notes, coloured by timing; tick marks are your taps.</p>
+      <p class="legend">Under the staff, gray marks show where each note falls (top row the first time through, bottom row the repeat). Dots are your taps: <span class="lg" style="--c:var(--perfect)">within 35 ms</span> <span class="lg" style="--c:var(--good)">within 75 ms</span> <span class="lg" style="--c:var(--off)">loose</span> <span class="lg" style="--c:var(--miss)">extra tap</span>. A mark with no dot is a missed note.</p>
     </div>`;
   }
 
@@ -987,6 +1010,8 @@
       more.setAttribute('aria-label', `More time signatures${hiddenOn ? `, ${hiddenOn} selected` : ''}`);
     }
     $('metro').setAttribute('aria-checked', String(!!S.metro));
+    $('tapSoundSw').setAttribute('aria-checked', String(!!S.tapSound));
+    $('silentSw').setAttribute('aria-checked', String(!!S.silentMode));
     $('hideSource').setAttribute('aria-checked', String(!!S.hideSource));
     $('latency').value = S.latency;
     const n = pool().length;
@@ -1022,6 +1047,13 @@
     }
     toggleGroup($('genres'), Object.keys(GENRES).map((g) => ({ val: g, label: GENRE_SHORT[g], aria: GENRES[g] })), 'genres', true);
     $('metro').addEventListener('click', () => { S.metro = !S.metro; save(); syncSettings(); });
+    $('tapSoundSw').addEventListener('click', () => { S.tapSound = !S.tapSound; save(); syncSettings(); });
+    $('silentSw').addEventListener('click', () => {
+      S.silentMode = !S.silentMode; save(); syncSettings();
+      if (S.silentMode) startSilentLoop(); else if (silentLoop) { silentLoop.pause(); silentLoopPlaying = false; }
+      updateSoundStatus();
+    });
+    if (!IS_IOS) { $('silentRow').hidden = true; $('silentHelp').hidden = true; }
     $('hideSource').addEventListener('click', () => { S.hideSource = !S.hideSource; save(); syncSettings(); renderOutcome(); setButtons(); });
     $('latency').addEventListener('change', (e) => { S.latency = Math.max(-300, Math.min(300, Number(e.target.value) || 0)); save(); syncSettings(); });
     $('btnCalib').addEventListener('click', calibrate);

@@ -20,7 +20,7 @@ Every excerpt plays twice (it's written with a repeat sign). **→ / N** loads t
 | Folk tunes | Essen folksong collection, O'Neill's *Music of Ireland* (1850), Ryan's *Mammoth Collection* (1883), Nottingham folk tunes, Aird's Airs |
 | Bach chorales | Soprano and bass lines of ~370 chorales |
 | Classical | Mozart, Haydn, Beethoven, Schubert, Schumann, Chopin, Handel, Corelli, Monteverdi and others: every part |
-| Ragtime | Joplin, *Maple Leaf Rag* (right hand) |
+| Ragtime | All 47 of Scott Joplin's rags (right hand), from Craig Stuart Sapp's digital edition (CC BY-NC-SA 4.0) |
 | Popular songs (to 1930) | 367 lead sheets from [OpenEWLD](https://github.com/00sapo/OpenEWLD): Tin Pan Alley, Broadway, early standards, traditional songs. Only US public domain: first performed in 1930 or earlier, traditional, or undated with all writers dead by 1930 |
 | Jazz solos | 456 transcribed improvisations from the [Weimar Jazz Database](https://jazzomat.hfm-weimar.de/) (Armstrong, Parker, Rollins, Coltrane, Davis, Brecker and others), via the MIT-licensed [jazzodata](https://github.com/klausfrieler/jazzodata) export |
 
@@ -72,10 +72,14 @@ git clone --depth 1 https://github.com/00sapo/OpenEWLD /tmp/OpenEWLD
 ```
 
 ```bash
-python3 tools/build_corpus.py --wjd /tmp/jazzodata/data --openewld /tmp/OpenEWLD
+git clone --depth 1 https://github.com/craigsapp/joplin /tmp/joplin
 ```
 
-Optionally add `--joplin /path/to/clone` of [craigsapp/joplin](https://github.com/craigsapp/joplin) for all 47 of Joplin's rags (ragtime goes from about 40 rhythms to about 1,500). That digital edition is licensed CC BY-NC-SA 4.0, so a build that includes it must stay non-commercial and share the rhythm data under the same licence.
+```bash
+python3 tools/build_corpus.py --wjd /tmp/jazzodata/data --openewld /tmp/OpenEWLD --joplin /tmp/joplin
+```
+
+The Joplin edition is licensed CC BY-NC-SA 4.0, so the rhythm data that includes it is shared under the same licence (see `data/LICENSE.md`) and Actual Rhythms stays free and non-commercial.
 
 Jazz solos are spelled into notation by `tools/wjd.py`: the database gives each note's bar, beat and subdivision; notes are held to the next attack (or to their transcribed length at phrase ends), split at beat boundaries with ties, and beats subdivided in 3 or 6 become triplets. Swing eighths are written straight, as on any jazz chart.
 

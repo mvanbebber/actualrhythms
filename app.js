@@ -114,12 +114,29 @@
     recent.push(cand); if (recent.length > 40) recent.shift();
     const occs = cand.o.filter((o) => S.genres.includes(genreOf(o)));
     const occ = occs[Math.floor(Math.random() * occs.length)];
+    seen.splice(seenPos + 1); // picking a new one drops anything "forward" of where you were
+    seen.push({ item: cand, occ }); if (seen.length > 200) seen.shift();
+    seenPos = seen.length - 1;
+    show(cand, occ, p.length);
+  }
+
+  // excerpts already shown this session, for the Left/Right arrow keys
+  const seen = [];
+  let seenPos = -1;
+  function stepHistory(dir) {
+    if (dir < 0 && seenPos <= 0) return;
+    if (dir > 0 && seenPos >= seen.length - 1) { pickNext(); return; }
+    seenPos += dir;
+    show(seen[seenPos].item, seen[seenPos].occ, pool().length);
+  }
+
+  function show(cand, occ, poolSize) {
     current = { item: cand, occ, flat: flatten(cand), mi: meterInfo(cand.m) };
     lastResult = null;
     $('result').hidden = true;
     $('legend').hidden = true;
     render();
-    updatePool(p.length);
+    updatePool(poolSize);
     if (!S.hideSource) showSourceOnly();
     piano.prepare(pianoPitches()); // fetch the samples this excerpt needs in the background
   }
@@ -744,7 +761,7 @@
     $('btnCalib').onclick = calibrate;
     $('btnPlay').onclick = () => (run ? stopRun() : startRun('play'));
     $('btnListen').onclick = () => startRun('listen');
-    $('btnNext').onclick = () => { pickNext(); setButtons(); };
+    $('btnNext').onclick = () => { stepHistory(1); setButtons(); };
     const pad = $('pad');
     pad.addEventListener('pointerdown', (e) => { e.preventDefault(); onTap(e); });
     document.addEventListener('keydown', (e) => {
@@ -758,7 +775,13 @@
         if (tgt.closest('button')) return;
         e.preventDefault(); run ? stopRun() : startRun('play');
       } else if (e.key === 'Escape') stopRun();
-      else if (phase === 'idle' && e.code === 'KeyN') { pickNext(); setButtons(); }
+      else if (phase === 'idle' && e.code === 'KeyN') { stepHistory(1); setButtons(); }
+      else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        if (run) stopRun();
+        stepHistory(e.key === 'ArrowRight' ? 1 : -1);
+        setButtons();
+      }
       else if (phase === 'idle' && e.code === 'KeyL') startRun('listen');
     });
     let rt;

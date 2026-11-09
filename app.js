@@ -548,8 +548,12 @@
       const key = Math.max(1, Math.min(88, midi - 20));
       return { note: `audio/piano/v${layerFor(vel)}/${s.name}.mp3`, rel: `audio/piano/release/rel${key}.mp3`, rate: s.rate };
     };
+    // where each sample's sound starts and how loud it peaks (tools/piano_offsets.py)
+    let OFF = {};
+    const offsReady = fetch('audio/piano/offsets.json').then((r) => (r.ok ? r.json() : {})).then((j) => { OFF = j; }).catch(() => {});
+    const offsetOf = (url) => OFF[url.replace('audio/piano/', '')] || [0, 0.33];
     function prepare(notes) {
-      return Promise.all(notes.flatMap(({ midi, vel }) => { const u = urls(midi, vel); return [load(u.note), load(u.rel)]; }));
+      return Promise.all([offsReady, ...notes.flatMap(({ midi, vel }) => { const u = urls(midi, vel); return [load(u.note), load(u.rel)]; })]);
     }
     function play(t, dur, midi, vel) {
       const c = audio();
@@ -558,6 +562,8 @@
       const gen = audioGen;
       Promise.all([load(u.note), load(u.rel)]).then(([buf, rel]) => {
         if (gen !== audioGen || t < c.currentTime) return; // stopped meanwhile, or arrived too late // arrived too late (only if prepare() was skipped)
+        const [noteStart, notePeak] = offsetOf(u.note);
+        const [relStart, relPeak] = offsetOf(u.rel);
         const src = c.createBufferSource(); const g = c.createGain();
         src.buffer = buf; src.playbackRate.value = u.rate;
         const level = 0.75 + 0.35 * vel;
@@ -565,10 +571,15 @@
         g.gain.setValueAtTime(level, t);
         g.gain.setValueAtTime(level, off);
         g.gain.setTargetAtTime(0, off, 0.07); // damper
-        src.connect(g).connect(master); src.start(t); src.stop(off + 0.6);
+        src.connect(g).connect(master);
+        src.start(t, noteStart); // skip the sample's lead-in so the attack lands on the beat
+        src.stop(off + 0.6);
+        // key mechanism noise, struck with the note and kept well under it (about 18 dB below its peak)
         const rs = c.createBufferSource(); const rg = c.createGain();
-        rs.buffer = rel; rg.gain.value = 0.35 + 0.4 * vel;
-        rs.connect(rg).connect(master); rs.start(off);
+        rs.buffer = rel;
+        rg.gain.value = Math.min(1, (0.12 * notePeak * level) / Math.max(relPeak, 0.01));
+        rs.connect(rg).connect(master);
+        rs.start(t, relStart);
         scheduled.push(src, rs);
       }).catch(() => { /* a missing sample just stays silent */ });
     }

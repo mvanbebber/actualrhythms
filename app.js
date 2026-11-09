@@ -16,6 +16,8 @@
   };
   const GENRES = { folk: 'Folk tunes', chorale: 'Bach chorales', classical: 'Classical', ragtime: 'Ragtime' };
   const GRADE = { perfect: 0.035, good: 0.075 };
+  const REPEATS = 2; // every excerpt is played through twice (written with a repeat sign)
+  const WORSE = { perfect: 0, good: 1, off: 2, miss: 3 };
 
   // ---------- settings ----------
   const store = {
@@ -138,7 +140,7 @@
     let perRow = Math.max(1, Math.min(item.b, Math.floor((W - 50) / minBar)));
     if (item.b === 4 && perRow === 3) perRow = 2;
     const rows = Math.ceil(item.b / perRow);
-    const rowH = 110;
+    const rowH = 140; // room for one feedback lane per pass under the staff
     const renderer = new VF.Renderer(host, VF.Renderer.Backends.SVG);
     renderer.resize(W, rows * rowH + 10);
     const ctx = renderer.getContext();
@@ -178,8 +180,14 @@
         const ly = stave.getYForLine(0);
         const last = mIdx === item.b - 1;
         ctx.save(); ctx.setLineWidth(1.2);
-        ctx.beginPath(); ctx.moveTo(x + w - (last ? 5 : 0.5), ly - 15); ctx.lineTo(x + w - (last ? 5 : 0.5), ly + 15); ctx.stroke();
-        if (last) ctx.fillRect(x + w - 3.5, ly - 15, 3.5, 30);
+        if (last) {
+          // end-repeat sign: dots, thin line, thick line
+          ctx.beginPath(); ctx.moveTo(x + w - 8, ly - 15); ctx.lineTo(x + w - 8, ly + 15); ctx.stroke();
+          ctx.fillRect(x + w - 4.5, ly - 15, 4, 30);
+          [-6, 6].forEach((dy) => { ctx.beginPath(); ctx.arc(x + w - 13, ly + dy, 2, 0, Math.PI * 2); ctx.fill(); });
+        } else {
+          ctx.beginPath(); ctx.moveTo(x + w - 0.5, ly - 15); ctx.lineTo(x + w - 0.5, ly + 15); ctx.stroke();
+        }
         ctx.restore();
 
         const meas = measures(item)[mIdx];
@@ -226,7 +234,7 @@
           const ev = flat.events.find((q) => q.mi === mIdx && q.ei === i);
           pts.push([ev.pos, cx]);
         });
-        pts.push([m0 + mi.bar, x + w - 6]);
+        pts.push([m0 + mi.bar, x + w - (mIdx === item.b - 1 ? 18 : 6)]);
         rowInfo.segs.push({ t0: m0, t1: m0 + mi.bar, pts });
         x += w;
       }
@@ -269,12 +277,13 @@
     const g = document.createElementNS(NS, 'g');
     const soft = cssVar('--ink-soft');
     const total = current.flat.total;
+    const LANE = 26;
     lastResult.tapTicks.forEach((tk) => {
-      const t = Math.max(0, Math.min(total, tk.tick));
+      const t = Math.max(0, Math.min(total, tk.tick - tk.pass * total));
       const p = tickToXY(t);
       if (!p) return;
       const l = document.createElementNS(NS, 'line');
-      const y = p.row.y + 86;
+      const y = p.row.y + 86 + tk.pass * LANE;
       l.setAttribute('x1', p.x); l.setAttribute('x2', p.x);
       l.setAttribute('y1', y); l.setAttribute('y2', y + 12);
       l.setAttribute('stroke', tk.extra ? cssVar('--miss') : soft);
@@ -283,10 +292,10 @@
     });
     // expected onset dots
     lastResult.onsets.forEach((o) => {
-      const p = tickToXY(o.tick);
+      const p = tickToXY(o.tick - o.pass * total);
       if (!p) return;
       const c = document.createElementNS(NS, 'circle');
-      c.setAttribute('cx', p.x); c.setAttribute('cy', p.row.y + 80); c.setAttribute('r', 3);
+      c.setAttribute('cx', p.x); c.setAttribute('cy', p.row.y + 80 + o.pass * LANE); c.setAttribute('r', 3);
       c.setAttribute('fill', cssVar('--' + o.grade));
       g.appendChild(c);
     });
@@ -360,16 +369,17 @@
     const t0 = start + countBeats * beatSec;
     for (let b = 0; b < countBeats; b++) click(start + b * beatSec, b === 0);
     const total = current.flat.total;
-    const nBeats = Math.round(total / mi.beat);
+    const nBeats = Math.round(total * REPEATS / mi.beat);
+    const passes = (fn) => { for (let p = 0; p < REPEATS; p++) soundingNotes().forEach((n) => fn(n, t0 + (n.pos + p * total) * spt)); };
     if (mode === 'play' && S.metro) for (let b = 0; b < nBeats; b++) click(t0 + b * beatSec, (b * mi.beat) % mi.bar === 0, true);
     if (mode === 'listen') {
       if (S.metro) for (let b = 0; b < nBeats; b++) click(t0 + b * beatSec, (b * mi.beat) % mi.bar === 0, true);
-      soundingNotes().forEach((n) => wood(t0 + n.pos * spt, n.len * spt));
+      passes((n, t) => wood(t, n.len * spt));
     }
     if (mode === 'melody') {
-      soundingNotes().forEach((n) => { if (n.midi) tone(t0 + n.pos * spt, n.len * spt, n.midi); });
+      passes((n, t) => { if (n.midi) tone(t, n.len * spt, n.midi); });
     }
-    run = { mode, start, t0, spt, beatSec, countBeats, taps: [], endAt: t0 + total * spt + (mode === 'play' ? beatSec * 0.75 : 0.1) };
+    run = { mode, start, t0, spt, beatSec, countBeats, taps: [], endAt: t0 + total * REPEATS * spt + (mode === 'play' ? beatSec * 0.75 : 0.1) };
     phase = 'countin';
     $('result').hidden = mode === 'play' ? true : $('result').hidden;
     if (mode === 'play') { lastResult = null; $('legend').hidden = true; render(); }
@@ -402,8 +412,9 @@
     } else {
       ci.hidden = true;
       phase = run.mode === 'play' ? 'playing' : 'listening';
+      const total = current.flat.total;
       const tk = (now - run.t0) / run.spt;
-      const p = tickToXY(Math.min(tk, current.flat.total));
+      const p = tickToXY(tk >= total * REPEATS ? total : tk % total);
       if (p) {
         ph.hidden = false;
         ph.style.left = (p.x / layout.W * 100) + '%';
@@ -449,7 +460,12 @@
   function score(r) {
     const evs = current.flat.events;
     const onsets = [];
-    evs.forEach((e, i) => { if (e.onset) onsets.push({ idx: i, tick: e.pos, t: r.t0 + e.pos * r.spt }); });
+    const total = current.flat.total;
+    for (let p = 0; p < REPEATS; p++) {
+      evs.forEach((e, i) => {
+        if (e.onset) { const tick = e.pos + p * total; onsets.push({ idx: i, pass: p, tick, t: r.t0 + tick * r.spt }); }
+      });
+    }
     onsets.forEach((o, k) => {
       const prev = k ? o.t - onsets[k - 1].t : Infinity;
       const next = k < onsets.length - 1 ? onsets[k + 1].t - o.t : Infinity;
@@ -460,7 +476,8 @@
     onsets.forEach((o, i) => taps.forEach((t, j) => { const d = t - o.t; if (Math.abs(d) <= o.win) pairs.push([Math.abs(d), i, j, d]); }));
     pairs.sort((a, b) => a[0] - b[0]);
     const usedO = new Set(); const usedT = new Set();
-    pairs.forEach(([, i, j, d]) => { if (usedO.has(i) || usedT.has(j)) return; usedO.add(i); usedT.add(j); onsets[i].err = d; });
+    const tapPass = {};
+    pairs.forEach(([, i, j, d]) => { if (usedO.has(i) || usedT.has(j)) return; usedO.add(i); usedT.add(j); onsets[i].err = d; tapPass[j] = onsets[i].pass; });
     let pts = 0; const cnt = { perfect: 0, good: 0, off: 0, miss: 0 };
     const errs = [];
     onsets.forEach((o) => {
@@ -478,8 +495,13 @@
     const mean = errs.length ? errs.reduce((a, b) => a + b, 0) / errs.length : 0;
     const sd = errs.length > 1 ? Math.sqrt(errs.reduce((a, b) => a + (b - mean) ** 2, 0) / (errs.length - 1)) : 0;
     const byEvent = {};
-    onsets.forEach((o) => { byEvent[o.idx] = o; });
-    const tapTicks = taps.map((t, j) => ({ tick: (t - r.t0) / r.spt, extra: !usedT.has(j) }));
+    // a note's colour on the staff is its worse result across the passes
+    onsets.forEach((o) => { if (!byEvent[o.idx] || WORSE[o.grade] > WORSE[byEvent[o.idx].grade]) byEvent[o.idx] = o; });
+    const tapTicks = taps.map((t, j) => {
+      const tick = (t - r.t0) / r.spt;
+      const pass = j in tapPass ? tapPass[j] : Math.max(0, Math.min(REPEATS - 1, Math.floor(tick / total)));
+      return { tick, pass, extra: !usedT.has(j) };
+    });
     lastResult = { onsets, byEvent, tapTicks, cnt, extra, pct, mean, sd };
     history.push({ d: Date.now(), p: pct, l: current.item.l });
     while (history.length > 500) history.shift();
@@ -586,7 +608,7 @@
     $('btnCalib').disabled = busy;
     $('padTitle').textContent = phase === 'calibrating' ? 'Tap with the clicks' : run && run.mode === 'play' ? 'Tap!' : 'Tap here, or press Space';
     $('padSub').textContent = phase === 'idle'
-      ? 'Start gives you one bar of count-in clicks. Tap each note\'s attack; hold nothing, skip rests.'
+      ? 'Start gives you one bar of count-in clicks, then the excerpt plays twice. Tap each note\'s attack; skip rests.'
       : run && run.mode !== 'play' ? 'Playback only, taps are not scored.' : '';
     $('tempoInline').textContent = current ? `♩ = ${S.tempo}${current.mi.compound ? ' (dotted)' : ''}` : '';
   }

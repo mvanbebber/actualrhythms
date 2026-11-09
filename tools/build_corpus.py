@@ -109,8 +109,7 @@ def fix_triplets(events):
             i += 1
 
 
-def measure_events(m, bar_ticks):
-    src = m.voices[0] if m.hasVoices() else m
+def voice_events(src, bar_ticks):
     evs, tie_ins = [], []
     pos = 0
     for n in src.notesAndRests:
@@ -127,6 +126,27 @@ def measure_events(m, bar_ticks):
         raise Skip('incomplete bar')
     fix_triplets(evs)
     return evs, tie_ins
+
+
+def measure_events(m, bar_ticks):
+    """Events for one bar. In multi-voice bars (piano right hand, divisi) take the
+    voice that actually plays the most: most sounding time, then most attacks."""
+    if not m.hasVoices():
+        return voice_events(m, bar_ticks)
+    best, best_key = None, None
+    for v in m.voices:
+        try:
+            evs, tins = voice_events(v, bar_ticks)
+        except Skip:
+            continue
+        sounding = sum(e[0] for e in evs if not e[2] & FLAG_REST)
+        attacks = sum(1 for e, t in zip(evs, tins) if not e[2] & FLAG_REST and not t)
+        key = (sounding, attacks)
+        if best_key is None or key > best_key:
+            best, best_key = (evs, tins), key
+    if best is None:
+        raise Skip('no usable voice')
+    return best
 
 
 import re

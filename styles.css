@@ -411,3 +411,53 @@ html[data-layout="wide"] .pills button.more .icon { display: none; }
   .credits { display: none; }
 }
 @media (pointer: fine) { .credits-help { display: none; } }
+
+/* ---------- touch devices: the page is locked to the screen; only inner panels scroll ---------- */
+@media (pointer: coarse) {
+  html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+  .app { height: 100vh; overflow: hidden; }
+  @supports (height: 100dvh) { .app { height: 100dvh; } }
+  .workspace { flex: 1 1 auto; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+  .practice { height: 100%; min-height: 0; }
+  .app { padding-bottom: max(var(--s2), env(safe-area-inset-bottom, 0px)); }
+
+  /* phone portrait: tighter rhythm so the source/results panel keeps real room */
+  html[data-layout="phone"] .app { gap: var(--s2); padding-top: max(var(--s2), env(safe-area-inset-top, 0px)); }
+  html[data-layout="phone"] .practice, html[data-layout="phone"] .stage, html[data-layout="phone"] .score-col { gap: var(--s2); }
+  html[data-layout="phone"] .sheet { max-height: 244px; } /* two staff rows; longer excerpts scroll inside */
+  html[data-layout="phone"] .pad { min-height: 88px; padding: var(--s2); }
+  html[data-layout="phone"] .pad-icon { width: 28px; height: 28px; }
+  html[data-layout="phone"] .pad-label { font-size: 18px; }
+  .stage { flex: none; }
+  .outcome { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; border-radius: var(--radius); }
+  .sheet { max-height: 46vh; overflow-y: auto; overscroll-behavior: contain; }
+  @supports (height: 100dvh) { .sheet { max-height: 46dvh; } }
+
+  /* sidebar fills the column and scrolls inside */
+  html[data-layout="wide"] .workspace { align-items: stretch; height: 100%; }
+  html[data-layout="wide"] .settings { position: static; max-height: none; height: 100%; min-height: 0; }
+
+  /* landscape phone: score and controls top-left, results below them, Tap pad down the right */
+  html[data-layout="phone-landscape"] .practice {
+    display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 3fr);
+    grid-template-rows: auto minmax(0, 1fr); column-gap: var(--s3); row-gap: var(--s2);
+  }
+  html[data-layout="phone-landscape"] .stage { display: contents; }
+  html[data-layout="phone-landscape"] .score-col { grid-column: 1; grid-row: 1; }
+  html[data-layout="phone-landscape"] .pad { grid-column: 2; grid-row: 1 / span 2; min-height: 0; }
+  html[data-layout="phone-landscape"] .outcome { grid-column: 1; grid-row: 2; }
+  html[data-layout="phone-landscape"] .sheet { max-height: 124px; } /* one staff row; longer excerpts scroll inside and follow the playhead */
+  html[data-layout="phone-landscape"] .score-col { gap: 6px; }
+}
+
+/* fixed header metrics so updating the practice count never nudges the score or pad */
+.wordmark { line-height: 26px; }
+.today { line-height: 18px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html[data-layout="medium"] .wordmark, html[data-layout="wide"] .wordmark { line-height: 34px; }
+.topbar { min-height: 48px; }
+
+/* landscape phones: the transport + tempo strip must fit the left column */
+html[data-layout="phone-landscape"] .transport .btn { padding: 0 10px; gap: 6px; }
+html[data-layout="phone-landscape"] .tempo { gap: 4px; padding-left: var(--s2); }
+html[data-layout="phone-landscape"] .tempo-read span { display: none; }
+html[data-layout="phone-landscape"] .tempo-read input { width: 3ch; }

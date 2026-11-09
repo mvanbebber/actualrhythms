@@ -49,6 +49,7 @@ async function newPage(browser, base, w, h, touch, settings) {
   await p.addInitScript((s) => localStorage.setItem('rr.settings', JSON.stringify(s)), Object.assign({ v: 2 }, settings || {}));
   await p.goto(base);
   await p.waitForSelector('#score svg');
+  await p.evaluate(() => document.fonts && document.fonts.ready);
   await p.waitForTimeout(300);
   return p;
 }
@@ -99,6 +100,8 @@ async function performTaps(p, { lateMs = 0, skipFirst = 0 } = {}) {
       check(pad.x > sheet.x + sheet.w, 'landscape: pad is not to the right of the score');
       check(pad.y + Math.min(pad.h, 160) <= h && ctl.y + ctl.h <= h, 'landscape: controls or pad below the fold');
       check(await p.$eval('.pad-label .short', (e) => getComputedStyle(e).display !== 'none'), 'landscape pad label should read "Tap"');
+      const up = await box(p, '#tempoUp');
+      check(up.x + up.w <= pad.x - 4, `landscape: tempo controls run under the Tap pad (${Math.round(up.x + up.w)} > ${Math.round(pad.x)})`);
     } else check(await p.$eval('.pad-label .long', (e) => getComputedStyle(e).display !== 'none'), 'pad label should read "Tap the rhythm"');
     const svgW = await p.$eval('#score svg', (s) => s.getBoundingClientRect().width);
     const hostW = await p.$eval('#score', (s) => s.clientWidth);
@@ -279,6 +282,48 @@ async function performTaps(p, { lateMs = 0, skipFirst = 0 } = {}) {
     check(p.errors.length === 0, 'page errors: ' + p.errors.join(' | '));
     await p.screenshot({ path: path.join(OUT, 'laptop-advanced.png') });
     await p.context().close();
+  }
+
+  // 6. touch devices: the page is locked to the screen (nothing to scroll); inner panels scroll instead
+  for (const dev of ['iPhone 15 Pro', 'iPhone 15 Pro landscape', 'iPad Pro 11', 'iPad Pro 11 landscape']) {
+    for (const bars of [2, 4]) {
+      console.log(`locked: ${dev}, ${bars} bars`);
+      const { devices } = require('playwright');
+      const ctx = await browser.newContext(devices[dev]);
+      const p = await ctx.newPage();
+      const errs = []; p.on('pageerror', (e) => errs.push(e.message));
+      await p.addInitScript((b) => localStorage.setItem('rr.settings', JSON.stringify({ v: 2, levels: b === 4 ? [5] : [2, 3], bars: b })), bars);
+      await p.goto(base); await p.waitForSelector('#score svg'); await p.waitForTimeout(300);
+      const vh = await p.evaluate(() => window.innerHeight);
+      const m = await p.evaluate(() => ({ sh: document.scrollingElement.scrollHeight, ch: document.scrollingElement.clientHeight }));
+      check(m.sh <= m.ch + 1, `page can scroll (${m.sh} > ${m.ch})`);
+      for (const sel of ['.sheet', '.controls', '#pad']) {
+        const b = await box(p, sel);
+        check(b.y >= 0 && b.y + Math.min(b.h, 200) <= vh + 1, `${sel} not on screen (top ${Math.round(b.y)}, height ${Math.round(b.h)}, viewport ${vh})`);
+      }
+      if (dev.includes('iPhone') && dev.includes('landscape')) {
+        const up = await box(p, '#tempoUp'); const pd = await box(p, '#pad');
+        check(up.x + up.w <= pd.x - 4, `tempo controls run under the Tap pad (${Math.round(up.x + up.w)} > ${Math.round(pd.x)})`);
+      }
+      const out = await box(p, '#outcome');
+      check(out.h >= 40 && out.y + 40 <= vh, `results/source area not visible (height ${Math.round(out.h)})`);
+      if (bars === 4 && dev === 'iPhone 15 Pro') {
+        const s = await p.$eval('.sheet', (e) => ({ sh: e.scrollHeight, ch: e.clientHeight }));
+        console.log(`  dense 4 bars: score box ${s.ch}px showing ${s.sh}px of notation${s.sh > s.ch ? ' (scrolls inside)' : ''}`);
+      }
+      if (bars === 2 && dev === 'iPhone 15 Pro landscape') {
+        await p.click('#btnPlay');
+        await performTaps(p);
+        await p.waitForFunction(() => window.actualRhythms.result, null, { timeout: 30000 });
+        await p.waitForTimeout(200);
+        check(await p.evaluate(() => document.scrollingElement.scrollHeight <= document.scrollingElement.clientHeight + 1), 'page scrolls after results');
+        check(await p.isVisible('.result .bigscore'), 'score not visible in landscape results');
+        await p.screenshot({ path: path.join(OUT, 'locked-iphone-landscape-result.png') });
+      }
+      await p.screenshot({ path: path.join(OUT, `locked-${dev.replace(/ /g, '-')}-${bars}bars.png`) });
+      check(errs.length === 0, 'page errors: ' + errs.join(' | '));
+      await ctx.close();
+    }
   }
 
   await browser.close();

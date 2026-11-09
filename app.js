@@ -613,6 +613,15 @@
         ph.style.left = (p.x * layout.s) + 'px';
         ph.style.top = (p.row.top * layout.s) + 'px';
         ph.style.height = (p.row.height * layout.s) + 'px';
+        // a tall score scrolls inside its box (locked touch layout): keep the playing row in view
+        if (run.row !== p.row) {
+          run.row = p.row;
+          const sheet = ph.closest('.sheet');
+          if (sheet.scrollHeight > sheet.clientHeight + 1) {
+            const r = ph.getBoundingClientRect(); const b = sheet.getBoundingClientRect();
+            if (r.top < b.top || r.bottom > b.bottom) sheet.scrollTop += r.top - b.top - 8;
+          }
+        }
       }
     }
     if (c.currentTime >= run.endAt) { finishRun(); return; }

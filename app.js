@@ -1,4 +1,4 @@
-/* Repertoire Rhythms: rhythm sight-reading with excerpts from real music. */
+/* Actual Rhythms: rhythm sight-reading with excerpts from real music. */
 (function () {
   'use strict';
   const DATA = window.RHYTHM_DATA;
@@ -662,7 +662,7 @@
   }
 
   // read-only handle for automated tests
-  window.repertoireRhythms = { get current() { return current; }, get run() { return run; }, get result() { return lastResult; }, audio };
+  window.actualRhythms = { get current() { return current; }, get run() { return run; }, get result() { return lastResult; }, audio };
 
   setupUI();
   updateSession();

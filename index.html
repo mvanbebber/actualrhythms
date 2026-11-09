@@ -1,5 +1,9 @@
+<!doctype html>
+<html lang="en">
+<head>
 <meta charset="utf-8">
-<title>Repertoire Rhythms</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Actual Rhythms</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <meta name="description" content="Rhythm sight-reading practice using only rhythms cut from real, public-domain music.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -119,11 +123,13 @@ legend, .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.0
 footer { font-size: 12px; color: var(--ink-soft); max-width: 80ch; }
 @media (prefers-reduced-motion: reduce) { .pad { transition: none; } }
 </style>
+</head>
+<body>
 
 <div class="app">
   <header class="top">
     <div class="brand">
-      <h1>Repertoire <i>Rhythms</i></h1>
+      <h1>Actual <i>Rhythms</i></h1>
       <p>Sight-read rhythms cut from real music: folk tunes, Bach chorales, rags and string quartets. Tap along, then find out where the rhythm came from.</p>
     </div>
     <div class="session" id="session"></div>
@@ -217,3 +223,5 @@ footer { font-size: 12px; color: var(--ink-soft); max-width: 80ch; }
 <script src="vendor/vexflow.js"></script>
 <script src="data/rhythms.js"></script>
 <script src="app.js"></script>
+</body>
+</html>

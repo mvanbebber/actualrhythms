@@ -1,4 +1,4 @@
-# Repertoire Rhythms
+# Actual Rhythms
 
 A rhythm sight-reading trainer in the spirit of Rhythm Sight Reading Trainer, with one difference: **every rhythm is a real passage from real music**. Nothing is randomly generated. Each excerpt is a 2- or 4-bar window cut from an actual melodic line, and after you play it the app tells you where it came from and can play the original melody.
 
@@ -61,3 +61,7 @@ To add your own music, drop MusicXML / ABC / kern files into a folder and add it
 - `data/rhythms.js` – generated rhythm corpus
 - `vendor/vexflow.js` – VexFlow 4.2.3 (MIT)
 - `tools/build_corpus.py` – corpus extraction
+
+## Hosting
+
+The site is served by GitHub Pages from the `main` branch at https://actualrhythms.com (see `CNAME`).

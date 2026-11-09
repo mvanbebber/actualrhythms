@@ -64,4 +64,4 @@ To add your own music, drop MusicXML / ABC / kern files into a folder and add it
 
 ## Hosting
 
-The site is served by GitHub Pages from the `main` branch at https://actualrhythms.com (see `CNAME`).
+Deployed on Netlify at https://actualrhythms.com. `netlify.toml` configures it: no build command, the repository root is published, and `tools/` is not served. Connect the GitHub repo in Netlify and every push to `main` redeploys.

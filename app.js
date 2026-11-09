@@ -49,6 +49,9 @@
   // (delayed) click with the (equally delayed) metronome; with them off you line up your touch.
   // Calibrations before this existed never played tap clicks.
   if (!S.calibClick || typeof S.calibClick !== 'object') S.calibClick = { speaker: false, bluetooth: false };
+  // Tap click is remembered per output; off for Bluetooth, whose delay makes your own click arrive late.
+  if (!S.tapSoundBy || typeof S.tapSoundBy !== 'object') S.tapSoundBy = { speaker: true, bluetooth: false };
+  S.tapSound = !!S.tapSoundBy[S.output];
   const calibStale = () => latencyMs() !== 0 && S.calibClick[S.output] !== !!S.tapSound;
   const OUTPUT_NAME = { speaker: 'speaker or wired headphones', bluetooth: 'Bluetooth headphones' };
   const save = () => store.set('settings', S);
@@ -1124,7 +1127,10 @@
     }
     toggleGroup($('genres'), Object.keys(GENRES).map((g) => ({ val: g, label: GENRE_SHORT[g], aria: GENRES[g] })), 'genres', true);
     $('metro').addEventListener('click', () => { S.metro = !S.metro; save(); syncSettings(); });
-    $('tapSoundSw').addEventListener('click', () => { S.tapSound = !S.tapSound; save(); syncSettings(); if (lastResult) renderOutcome(); });
+    $('tapSoundSw').addEventListener('click', () => {
+      S.tapSound = !S.tapSound; S.tapSoundBy[S.output] = S.tapSound;
+      save(); syncSettings(); if (lastResult) renderOutcome();
+    });
     $('lowLatencySw').addEventListener('click', () => {
       S.lowLatency = !S.lowLatency; save(); syncSettings();
       if (S.lowLatency) startKeepAlive(); else stopKeepAlive();
@@ -1139,6 +1145,11 @@
     $('hideSource').addEventListener('click', () => { S.hideSource = !S.hideSource; save(); syncSettings(); renderOutcome(); setButtons(); });
     $('latency').addEventListener('change', (e) => { S.offsets[S.output] = Math.max(-300, Math.min(500, Number(e.target.value) || 0)); save(); syncSettings(); });
     toggleGroup($('outputs'), [{ val: 'speaker', label: 'Speaker / wired' }, { val: 'bluetooth', label: 'Bluetooth' }], 'output', false, false);
+    // runs after the button's own handler has set S.output: bring that output's tap-click setting with it
+    $('outputs').addEventListener('click', () => {
+      S.tapSound = !!S.tapSoundBy[S.output];
+      save(); syncSettings(); if (lastResult) renderOutcome();
+    });
     $('btnCalib').addEventListener('click', calibrate);
     $('btnTestSound').addEventListener('click', async () => {
       const ok = await ensureRunning();

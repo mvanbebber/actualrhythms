@@ -15,7 +15,7 @@
     4: ['Sixteenths', 'Sixteenth-note grid, dotted eighth + sixteenth.'],
     5: ['Advanced', 'Triplets, 32nds, sixteenth syncopation.'],
   };
-  const GENRES = { folk: 'Folk tunes', chorale: 'Bach chorales', classical: 'Classical', ragtime: 'Ragtime', jazz: 'Jazz solos', popular: 'Popular songs (to 1930)' };
+  const GENRES = { folk: 'Folk tunes', chorale: 'Bach chorales', classical: 'Classical', ragtime: 'Ragtime', jazz: 'Jazz solos', popular: 'Popular songs' };
   const GRADE = { perfect: 0.035, good: 0.075 };
   const REPEATS = 2; // every excerpt is played through twice (written with a repeat sign)
   const WORSE = { perfect: 0, good: 1, off: 2, miss: 3 };

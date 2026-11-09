@@ -37,8 +37,9 @@ def joplin_jobs(root):
         }
 
 
-def openewld_jobs(root):
-    """root: a clone of https://github.com/00sapo/OpenEWLD."""
+def openewld_jobs(root, us_pd_only=True):
+    """root: a clone of https://github.com/00sapo/OpenEWLD. us_pd_only=False keeps every song
+    (the site owner has permission for the songs that are not US public domain)."""
     db = sqlite3.connect(os.path.join(root, 'OpenEWLD.db'))
     works = db.execute('select id, title, first_performance_date, path_leadsheet from works').fetchall()
     kept = skipped = 0
@@ -55,7 +56,7 @@ def openewld_jobs(root):
             ok = True
         else:
             ok = bool(people) and all(d is not None and d <= US_PD_LAST_YEAR for d in deaths)
-        if not ok:
+        if not ok and us_pd_only:
             skipped += 1
             continue
         kept += 1

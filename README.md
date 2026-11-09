@@ -21,7 +21,7 @@ Every excerpt plays twice (it's written with a repeat sign). **→ / N** loads t
 | Bach chorales | Soprano and bass lines of ~370 chorales |
 | Classical | Mozart, Haydn, Beethoven, Schubert, Schumann, Chopin, Handel, Corelli, Monteverdi and others: every part |
 | Ragtime | All 47 of Scott Joplin's rags (right hand), from Craig Stuart Sapp's digital edition (CC BY-NC-SA 4.0) |
-| Popular songs (to 1930) | 367 lead sheets from [OpenEWLD](https://github.com/00sapo/OpenEWLD): Tin Pan Alley, Broadway, early standards, traditional songs. Only US public domain: first performed in 1930 or earlier, traditional, or undated with all writers dead by 1930 |
+| Popular songs | All 568 lead sheets in [OpenEWLD](https://github.com/00sapo/OpenEWLD): Tin Pan Alley, Broadway, standards, traditional songs. Songs that are not US public domain (first performed after 1930) are included with the site owner's permission; without `--openewld-all` the build keeps only US public domain |
 | Jazz solos | 456 transcribed improvisations from the [Weimar Jazz Database](https://jazzomat.hfm-weimar.de/) (Armstrong, Parker, Rollins, Coltrane, Davis, Brecker and others), via the MIT-licensed [jazzodata](https://github.com/klausfrieler/jazzodata) export |
 
 For multi-voice staves (piano, divisi) it reads the busiest voice in each bar. For each line it keeps complete bars only, splits them into 2- and 4-bar windows, drops windows that start in the middle of a tied note or use tuplets other than triplets, and deduplicates identical rhythms (keeping up to five sources each, with their pitches). Each rhythm is then graded:
@@ -76,7 +76,7 @@ git clone --depth 1 https://github.com/craigsapp/joplin /tmp/joplin
 ```
 
 ```bash
-python3 tools/build_corpus.py --wjd /tmp/jazzodata/data --openewld /tmp/OpenEWLD --joplin /tmp/joplin
+python3 tools/build_corpus.py --wjd /tmp/jazzodata/data --openewld /tmp/OpenEWLD --openewld-all --joplin /tmp/joplin
 ```
 
 The Joplin edition is licensed CC BY-NC-SA 4.0, so the rhythm data that includes it is shared under the same licence (see `data/LICENSE.md`) and Actual Rhythms stays free and non-commercial.

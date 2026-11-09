@@ -399,6 +399,8 @@ def main():
                     help='clone of https://github.com/craigsapp/joplin (CC BY-NC-SA 4.0); adds all of Joplin\'s rags')
     ap.add_argument('--openewld', metavar='DIR',
                     help='clone of https://github.com/00sapo/OpenEWLD; adds US-public-domain popular songs')
+    ap.add_argument('--openewld-all', action='store_true',
+                    help='with --openewld: keep every song, not only US public domain (requires permission)')
     ap.add_argument('--wjd', metavar='DIR',
                     help="jazzodata's data/ folder (git clone https://github.com/klausfrieler/jazzodata); adds jazz solos")
     args = ap.parse_args()
@@ -439,8 +441,8 @@ def main():
             extra_jobs += list(extra_sources.joplin_jobs(args.joplin))
             found = [w for w in found if w['src']['folder'] != 'joplin']  # the same Maple Leaf Rag, better edition
         if args.openewld:
-            extra_jobs += list(extra_sources.openewld_jobs(args.openewld))
-            print('openewld: kept %d US-public-domain songs, skipped %d' % extra_sources.openewld_jobs.counts, file=sys.stderr)
+            extra_jobs += list(extra_sources.openewld_jobs(args.openewld, us_pd_only=not args.openewld_all))
+            print('openewld: kept %d songs, skipped %d' % extra_sources.openewld_jobs.counts, file=sys.stderr)
     if extra_jobs:
         n0 = len(found)
         with Pool(args.jobs) as pool:

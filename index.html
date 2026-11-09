@@ -20,8 +20,10 @@
     return 'medium';
   };
   document.documentElement.dataset.layout = window.computeLayout();
+  // touch devices (phones, iPads, including iPads with a keyboard or trackpad) get the locked, no-scroll page
+  if (navigator.maxTouchPoints > 0 || 'ontouchstart' in window) document.documentElement.dataset.touch = '';
 </script>
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=7">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
@@ -135,6 +137,11 @@
               <span id="hideLabel">Hide the source until I've played it</span>
               <button class="switch" id="hideSource" type="button" role="switch" aria-labelledby="hideLabel"></button>
             </div>
+            <div class="help-block">
+              <h3>Sound check</h3>
+              <p class="help" id="soundStatus"></p>
+              <button class="btn" id="btnTestSound" type="button">Play test sound</button>
+            </div>
             <div class="calib">
               <h3>Timing calibration</h3>
               <p class="help">Bluetooth audio adds delay. Calibrate plays 16 clicks; tap along with the last 12 and the offset is measured for you.</p>
@@ -165,13 +172,10 @@
     </aside>
   </div>
 
-  <footer class="credits">
-    Rhythms come from public-domain scores in the music21 corpus (Essen folksongs, O'Neill's and Ryan's fiddle tunes, the Nottingham folk tunes, Bach chorales, Joplin, Mozart, Haydn, Beethoven and others) and from the Weimar Jazz Database's transcriptions of improvised solos (Jazzomat Research Project, MIT license). Every excerpt is a real passage. Piano: Salamander Grand Piano V3 by Alexander Holm (CC BY 3.0). Notation by VexFlow.
-  </footer>
 </div>
 
 <script src="vendor/vexflow.js"></script>
 <script src="data/rhythms.js"></script>
-<script src="app.js"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>

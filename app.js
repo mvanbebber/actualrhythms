@@ -366,48 +366,80 @@
   }
   preferPlaybackSession();
   function audio() {
-    if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
-    // 'suspended' before the first gesture; 'interrupted' on iOS after a call, Siri or backgrounding
+    if (!ac) {
+      ac = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
+      ac.onstatechange = updateSoundStatus;
+    }
+    // 'suspended' before the first tap; 'interrupted' on iOS after a call, Siri or backgrounding
     if (ac.state !== 'running' && ac.state !== 'closed') ac.resume().catch(() => {});
     return ac;
   }
-  // A silent, looping <audio> element switches iOS into its media-playback audio session,
-  // which is what lets Web Audio sound when the phone is in Silent mode. It has to be started
-  // from a completed tap or click (iOS ignores play() from a touch-down), so keep trying until
-  // it is really playing.
+  // Resolve true once the context is actually producing sound (iOS only lets it start from a
+  // completed tap, which can arrive a moment after the touch that started an attempt).
+  function ensureRunning(timeoutMs = 2000) {
+    const c = audio();
+    if (c.state === 'running') return Promise.resolve(true);
+    return new Promise((res) => {
+      const t0 = performance.now();
+      const poll = () => {
+        if (c.state === 'running') return res(true);
+        if (performance.now() - t0 > timeoutMs) return res(false);
+        c.resume().catch(() => {});
+        setTimeout(poll, 40);
+      };
+      poll();
+    });
+  }
+  // A silent, looping <audio> element puts iOS into its media-playback audio session, which is
+  // what lets Web Audio sound while the phone is in Silent mode. iOS only allows play() from a
+  // completed tap or click, so it is (re)tried on those until it is really playing.
   const IS_IOS = /iP(hone|ad|od)/.test(navigator.platform) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   let silentLoop = null;
   let silentLoopPlaying = false;
-  function silentWavURL() {
-    const n = 4000; // half a second of 8 kHz, 8-bit silence
-    const buf = new ArrayBuffer(44 + n); const v = new DataView(buf);
+  function silentWavDataURI() {
+    const rate = 44100; const n = rate / 4; // a quarter second of 16-bit mono silence
+    const bytes = new Uint8Array(44 + n * 2); const v = new DataView(bytes.buffer);
     const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
-    str(0, 'RIFF'); v.setUint32(4, 36 + n, true); str(8, 'WAVE'); str(12, 'fmt ');
+    str(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); str(8, 'WAVE'); str(12, 'fmt ');
     v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
-    v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true);
-    str(36, 'data'); v.setUint32(40, n, true);
-    for (let i = 0; i < n; i++) v.setUint8(44 + i, 128);
-    return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+    v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    str(36, 'data'); v.setUint32(40, n * 2, true);
+    let bin = ''; for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return 'data:audio/wav;base64,' + btoa(bin);
   }
   function startSilentLoop() {
     if (!IS_IOS || silentLoopPlaying || document.hidden) return;
     if (!silentLoop) {
       silentLoop = document.createElement('audio');
-      silentLoop.src = silentWavURL();
+      silentLoop.src = silentWavDataURI();
       silentLoop.loop = true;
       silentLoop.preload = 'auto';
       silentLoop.setAttribute('playsinline', '');
+      silentLoop.setAttribute('webkit-playsinline', '');
       silentLoop.setAttribute('x-webkit-airplay', 'deny');
-      silentLoop.addEventListener('pause', () => { silentLoopPlaying = false; });
+      silentLoop.addEventListener('pause', () => { silentLoopPlaying = false; updateSoundStatus(); });
+      silentLoop.addEventListener('playing', () => {
+        const first = !silentLoopPlaying && !silentLoop.bounced;
+        silentLoopPlaying = true; updateSoundStatus();
+        // An engine that started before the loop may still be in iOS's 'ambient' session (muted by
+        // Silent mode). Restart it once, while idle, so it re-attaches in the playback session.
+        if (first && ac && ac.state === 'running' && !run) {
+          silentLoop.bounced = true;
+          ac.suspend().then(() => ac.resume()).catch(() => {}).then(updateSoundStatus);
+        }
+      });
+      document.body.appendChild(silentLoop);
     }
-    const pr = silentLoop.play();
-    if (pr && pr.then) pr.then(() => { silentLoopPlaying = true; }, () => { silentLoopPlaying = false; });
-    else silentLoopPlaying = true;
+    try {
+      const pr = silentLoop.play();
+      if (pr && pr.catch) pr.catch(() => { silentLoopPlaying = false; updateSoundStatus(); });
+    } catch (e) { /* ignore */ }
   }
-  // every gesture: make sure the context is running; completed taps/clicks also start the loop
+  // Activation events only: iOS grants audio permission on touchend / click / keydown (not touch-down).
   let primed = false;
-  function onGesture(e) {
+  function onActivation() {
     preferPlaybackSession();
+    startSilentLoop(); // before the context starts, so it starts in the playback session
     const c = audio();
     if (!primed) {
       primed = true;
@@ -415,9 +447,21 @@
         const src = c.createBufferSource(); src.buffer = c.createBuffer(1, 1, 22050); src.connect(c.destination); src.start(0);
       } catch (err) { /* ignore */ }
     }
-    if (e.type === 'touchend' || e.type === 'click' || e.type === 'keydown') startSilentLoop();
+    updateSoundStatus();
   }
-  ['pointerdown', 'touchend', 'click', 'keydown'].forEach((t) => document.addEventListener(t, onGesture, { capture: true, passive: true }));
+  ['touchend', 'click', 'keydown', 'mousedown'].forEach((t) => document.addEventListener(t, onActivation, { capture: true, passive: true }));
+
+  function updateSoundStatus() {
+    const el = document.getElementById('soundStatus');
+    if (!el) return;
+    const parts = [
+      `Audio engine: ${ac ? ac.state : 'not started yet'}${ac ? ` (${ac.sampleRate} Hz)` : ''}`,
+      navigator.audioSession ? `iOS audio session: ${navigator.audioSession.type}` : null,
+      IS_IOS ? `Silent-mode workaround: ${silentLoopPlaying ? 'on' : 'off'}` : null,
+    ].filter(Boolean);
+    el.textContent = parts.join(' · ');
+  }
+
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { if (silentLoop) silentLoop.pause(); return; } // don't hold the audio session in the background
     if (ac && ac.state !== 'running') ac.resume().catch(() => {});
@@ -432,6 +476,16 @@
     g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.001); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
     o.connect(g).connect(c.destination); o.start(t); o.stop(t + 0.05);
     scheduled.push(o);
+  }
+  // instant feedback for each tap: a short, dry woodblock-like tick, lower than the metronome
+  function tapSound() {
+    if (!ac || ac.state !== 'running') return;
+    const t = ac.currentTime;
+    const o = ac.createOscillator(); const g = ac.createGain(); const f = ac.createBiquadFilter();
+    o.type = 'triangle'; o.frequency.setValueAtTime(900, t); o.frequency.exponentialRampToValueAtTime(520, t + 0.03);
+    f.type = 'bandpass'; f.frequency.value = 1100; f.Q.value = 1.4;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.5, t + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+    o.connect(f).connect(g).connect(ac.destination); o.start(t); o.stop(t + 0.07);
   }
   // Salamander Grand Piano V3 (Alexander Holm, CC BY 3.0): 4 of its 16 velocity layers,
   // sampled every minor third from A0 to C8, plus per-key release (damper) sounds.
@@ -507,14 +561,13 @@
     const base = pos % mi.bar === 0 ? 0.875 : pos % mi.beat === 0 ? 0.625 : pos % (mi.beat / 2) === 0 ? 0.375 : 0.125;
     return humanize ? base + (Math.random() - 0.5) * 0.12 : base;
   }
-  const LISTEN_MIDI = 72; // Listen plays the rhythm on one note (C5) so it stays a pure rhythm
+  const LISTEN_MIDI = 72; // fallback pitch (C5) for a note whose pitch is unknown
   function pianoPitches() {
     if (!current) return [];
     const out = [];
     soundingNotes().forEach((n) => {
       const vel = velocityAt(n.pos);
-      out.push({ midi: LISTEN_MIDI, vel });
-      if (n.midi) out.push({ midi: n.midi, vel });
+      out.push({ midi: n.midi || LISTEN_MIDI, vel });
     });
     return out;
   }
@@ -550,6 +603,13 @@
       loadingMode = null;
       if (run || phase !== 'idle') { setButtons(); return; }
     } else { loadingToken++; loadingMode = null; }
+    const token = loadingToken;
+    if (!(await ensureRunning())) {
+      if (token === loadingToken) setPadStatus('blocked', 'Sound is blocked by the browser. Tap Start again.');
+      updateSoundStatus();
+      return;
+    }
+    if (token !== loadingToken || run) return;
     const c = audio();
     const spt = secPerTick();
     const mi = current.mi;
@@ -564,7 +624,7 @@
     if (mode === 'play' && S.metro) for (let b = 0; b < nBeats; b++) click(t0 + b * beatSec, (b * mi.beat) % mi.bar === 0, true);
     if (mode === 'listen') {
       if (S.metro) for (let b = 0; b < nBeats; b++) click(t0 + b * beatSec, (b * mi.beat) % mi.bar === 0, true);
-      passes((n, t) => piano.play(t, n.len * spt, LISTEN_MIDI, velocityAt(n.pos, true)));
+      passes((n, t) => piano.play(t, n.len * spt, n.midi || LISTEN_MIDI, velocityAt(n.pos, true))); // the real melody
     }
     if (mode === 'melody') {
       passes((n, t) => { if (n.midi) piano.play(t, n.len * spt, n.midi, velocityAt(n.pos, true)); });
@@ -606,7 +666,7 @@
       const tk = (now - run.t0) / run.spt;
       const pass = Math.min(REPEATS - 1, Math.floor(tk / total));
       if (run.mode === 'play') setPadStatus('playing', pass === 0 ? 'Tap each note · first time' : 'Tap each note · repeat');
-      else setPadStatus('listening', run.mode === 'melody' ? 'Playing the melody' : 'Listening · taps are not scored');
+      else setPadStatus('listening', 'Playing the melody · taps are not scored');
       const p = tickToXY(tk >= total * REPEATS ? total : tk % total);
       if (p && layout) {
         ph.hidden = false;
@@ -656,6 +716,7 @@
       return;
     }
     run.taps.push(eventAudioTime(ev) - S.latency / 1000);
+    tapSound();
   }
 
   // ---------- scoring ----------
@@ -734,7 +795,6 @@
       <div class="eyebrow">Where this rhythm comes from</div>
       <h3>${esc(title)}${composer ? ` <em>${esc(composer)}</em>` : ''}</h3>
       <p>${part}${bars}, from ${esc(coll)}</p>
-      <div class="actions"><button class="btn" id="btnMelody" type="button" data-action="melody">${icon('note')}<span>Hear the melody</span></button></div>
       <p>${occurs}</p>
       ${others ? `<div class="eyebrow">Also found in</div><ul>${others}</ul>` : ''}${more}
     </div>`;
@@ -832,7 +892,7 @@
     if (running) setBtn($('btnPlay'), 'stop', 'Stop', 'Esc');
     else setBtn($('btnPlay'), 'play', lastResult ? 'Try again' : 'Start', 'Enter');
     $('btnPlay').disabled = !current || phase === 'calibrating';
-    setBtn($('btnListen'), 'speaker', loadingMode === 'listen' ? 'Loading…' : 'Listen', 'L');
+    setBtn($('btnListen'), 'speaker', loadingMode ? 'Loading…' : 'Listen', 'L');
     $('btnListen').disabled = phase !== 'idle' || !current || !!loadingMode;
     setBtn($('btnNext'), 'next', 'Next', '→', true);
     $('btnNext').disabled = phase === 'calibrating';
@@ -965,6 +1025,15 @@
     $('hideSource').addEventListener('click', () => { S.hideSource = !S.hideSource; save(); syncSettings(); renderOutcome(); setButtons(); });
     $('latency').addEventListener('change', (e) => { S.latency = Math.max(-300, Math.min(300, Number(e.target.value) || 0)); save(); syncSettings(); });
     $('btnCalib').addEventListener('click', calibrate);
+    $('btnTestSound').addEventListener('click', async () => {
+      const ok = await ensureRunning();
+      updateSoundStatus();
+      if (!ok) { $('soundStatus').textContent += ' · could not start audio'; return; }
+      const c = audio();
+      click(c.currentTime + 0.05, true);
+      try { await piano.prepare([{ midi: 72, vel: 0.625 }]); piano.play(audio().currentTime + 0.35, 0.8, 72, 0.625); } catch (e) { /* ignore */ }
+    });
+    updateSoundStatus();
     $('calibPad').addEventListener('pointerdown', (e) => { e.preventDefault(); onTap(e); });
     syncSettings();
   }

@@ -286,7 +286,6 @@ legend { padding: 0; margin-bottom: var(--s2); font-size: 14px; font-weight: 600
 .pool { margin: 0; padding-top: var(--s3); border-top: 1px solid var(--border); font-size: 13px; color: var(--muted); }
 .scrim { position: fixed; inset: 0; background: rgba(32, 38, 34, 0.32); z-index: 40; }
 
-.credits { margin-top: var(--s2); font-size: 12px; color: var(--muted); max-width: 90ch; }
 
 /* overlay presentations (everything except the wide layout) */
 html:not([data-layout="wide"]) .settings {
@@ -404,51 +403,44 @@ html[data-layout="wide"] .pills button.more .icon { width: 14px; height: 14px; }
 .seg button[aria-pressed="true"] + button[aria-pressed="true"] { border-left-color: rgba(255, 255, 255, 0.4); }
 html[data-layout="wide"] .pills button.more .icon { display: none; }
 
-/* touch devices (iPhone, iPad): bigger settings icon; credits live in Settings → Advanced instead of the footer */
-@media (pointer: coarse) {
-  .settings-btn .icon { width: 28px; height: 28px; }
-  html[data-layout="phone"] .settings-btn, html[data-layout="phone-landscape"] .settings-btn { width: 48px; height: 48px; }
-  .credits { display: none; }
+/* touch devices (iPhone, iPad): bigger settings icon */
+html[data-touch] .settings-btn .icon { width: 28px; height: 28px; }
+html[data-touch][data-layout="phone"] .settings-btn, html[data-touch][data-layout="phone-landscape"] .settings-btn { width: 48px; height: 48px; }
+
+/* ---------- touch devices: the page is pinned to the screen; only inner panels scroll ---------- */
+html[data-touch], html[data-touch] body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+html[data-touch] body { position: fixed; inset: 0; width: 100%; } /* stops iOS rubber-band scrolling of the page */
+html[data-touch] .app { height: 100%; overflow: hidden; padding-bottom: max(var(--s2), env(safe-area-inset-bottom, 0px)); }
+html[data-touch] .workspace { flex: 1 1 auto; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+html[data-touch] .practice { height: 100%; min-height: 0; }
+html[data-touch] .stage { flex: none; }
+html[data-touch] .outcome { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; border-radius: var(--radius); }
+html[data-touch] .sheet { max-height: 46vh; overflow-y: auto; overscroll-behavior: contain; }
+@supports (height: 100dvh) { html[data-touch] .sheet { max-height: 46dvh; } }
+
+/* phone portrait: tighter rhythm so the source/results panel keeps real room */
+html[data-touch][data-layout="phone"] .app { gap: var(--s2); padding-top: max(var(--s2), env(safe-area-inset-top, 0px)); }
+html[data-touch][data-layout="phone"] .practice, html[data-touch][data-layout="phone"] .stage, html[data-touch][data-layout="phone"] .score-col { gap: var(--s2); }
+html[data-touch][data-layout="phone"] .sheet { max-height: 244px; } /* two staff rows; longer excerpts scroll inside */
+html[data-touch][data-layout="phone"] .pad { min-height: 88px; padding: var(--s2); }
+html[data-touch][data-layout="phone"] .pad-icon { width: 28px; height: 28px; }
+html[data-touch][data-layout="phone"] .pad-label { font-size: 18px; }
+
+/* sidebar fills the column and scrolls inside */
+html[data-touch][data-layout="wide"] .workspace { align-items: stretch; height: 100%; }
+html[data-touch][data-layout="wide"] .settings { position: static; max-height: none; height: 100%; min-height: 0; }
+
+/* landscape phone: score and controls top-left, results below them, Tap pad down the right */
+html[data-touch][data-layout="phone-landscape"] .practice {
+  display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 3fr);
+  grid-template-rows: auto minmax(0, 1fr); column-gap: var(--s3); row-gap: var(--s2);
 }
-@media (pointer: fine) { .credits-help { display: none; } }
-
-/* ---------- touch devices: the page is locked to the screen; only inner panels scroll ---------- */
-@media (pointer: coarse) {
-  html, body { height: 100%; overflow: hidden; overscroll-behavior: none; }
-  .app { height: 100vh; overflow: hidden; }
-  @supports (height: 100dvh) { .app { height: 100dvh; } }
-  .workspace { flex: 1 1 auto; min-height: 0; grid-template-rows: minmax(0, 1fr); }
-  .practice { height: 100%; min-height: 0; }
-  .app { padding-bottom: max(var(--s2), env(safe-area-inset-bottom, 0px)); }
-
-  /* phone portrait: tighter rhythm so the source/results panel keeps real room */
-  html[data-layout="phone"] .app { gap: var(--s2); padding-top: max(var(--s2), env(safe-area-inset-top, 0px)); }
-  html[data-layout="phone"] .practice, html[data-layout="phone"] .stage, html[data-layout="phone"] .score-col { gap: var(--s2); }
-  html[data-layout="phone"] .sheet { max-height: 244px; } /* two staff rows; longer excerpts scroll inside */
-  html[data-layout="phone"] .pad { min-height: 88px; padding: var(--s2); }
-  html[data-layout="phone"] .pad-icon { width: 28px; height: 28px; }
-  html[data-layout="phone"] .pad-label { font-size: 18px; }
-  .stage { flex: none; }
-  .outcome { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; border-radius: var(--radius); }
-  .sheet { max-height: 46vh; overflow-y: auto; overscroll-behavior: contain; }
-  @supports (height: 100dvh) { .sheet { max-height: 46dvh; } }
-
-  /* sidebar fills the column and scrolls inside */
-  html[data-layout="wide"] .workspace { align-items: stretch; height: 100%; }
-  html[data-layout="wide"] .settings { position: static; max-height: none; height: 100%; min-height: 0; }
-
-  /* landscape phone: score and controls top-left, results below them, Tap pad down the right */
-  html[data-layout="phone-landscape"] .practice {
-    display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 3fr);
-    grid-template-rows: auto minmax(0, 1fr); column-gap: var(--s3); row-gap: var(--s2);
-  }
-  html[data-layout="phone-landscape"] .stage { display: contents; }
-  html[data-layout="phone-landscape"] .score-col { grid-column: 1; grid-row: 1; }
-  html[data-layout="phone-landscape"] .pad { grid-column: 2; grid-row: 1 / span 2; min-height: 0; }
-  html[data-layout="phone-landscape"] .outcome { grid-column: 1; grid-row: 2; }
-  html[data-layout="phone-landscape"] .sheet { max-height: 124px; } /* one staff row; longer excerpts scroll inside and follow the playhead */
-  html[data-layout="phone-landscape"] .score-col { gap: 6px; }
-}
+html[data-touch][data-layout="phone-landscape"] .stage { display: contents; }
+html[data-touch][data-layout="phone-landscape"] .score-col { grid-column: 1; grid-row: 1; }
+html[data-touch][data-layout="phone-landscape"] .pad { grid-column: 2; grid-row: 1 / span 2; min-height: 0; }
+html[data-touch][data-layout="phone-landscape"] .outcome { grid-column: 1; grid-row: 2; }
+html[data-touch][data-layout="phone-landscape"] .sheet { max-height: 124px; } /* one staff row; longer excerpts scroll inside and follow the playhead */
+html[data-touch][data-layout="phone-landscape"] .score-col { gap: 6px; }
 
 /* fixed header metrics so updating the practice count never nudges the score or pad */
 .wordmark { line-height: 26px; }

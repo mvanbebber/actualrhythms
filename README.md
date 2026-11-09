@@ -9,7 +9,7 @@ A rhythm sight-reading trainer in the spirit of Rhythm Sight Reading Trainer, wi
 3. Tap each note's attack on the pad, or with Space / F / J.
 4. Each note is colored by timing (within 35 ms, within 75 ms, loose, missed); your taps appear as tick marks under the staff. You get a score, your average early/late tendency, and the source of the rhythm.
 
-Every excerpt plays twice (it's written with a repeat sign). **→ / N** loads the next rhythm and **←** goes back to earlier ones. **Listen** plays the rhythm on a sampled grand piano; **Hear the melody** plays the original passage. **Calibrate** measures your device's audio/input delay (useful with Bluetooth headphones).
+Every excerpt plays twice (it's written with a repeat sign). **→ / N** loads the next rhythm and **←** goes back to earlier ones. **Listen** plays the original melody on a sampled grand piano. Each tap during an attempt plays a short click. **Calibrate** measures your device's audio/input delay (useful with Bluetooth headphones).
 
 ## Where the rhythms come from
 

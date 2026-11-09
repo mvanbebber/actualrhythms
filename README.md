@@ -33,6 +33,19 @@ For multi-voice staves (piano, divisi) it reads the busiest voice in each bar. F
 | 4 Sixteenths | Sixteenth grid |
 | 5 Advanced | Triplets, 32nds, sixteenth-level syncopation |
 
+## Layouts
+
+The interface picks one of four layouts from the viewport's size (never the device type):
+
+| Layout | When | Settings appear as |
+|---|---|---|
+| Phone | narrower than 600px | bottom sheet |
+| Phone landscape | 500px tall or less, wider than tall | full-screen dialog; score and controls left, tall Tap pad right |
+| Medium (iPad portrait, Split View) | 600–999px wide | slide-over panel from the right |
+| Wide (iPad landscape, laptop) | 1000px+ wide and taller than 500px | persistent sidebar |
+
+Notation is laid out per measure: bars wrap only at barlines, each bar gets width in proportion to how dense it is, and the score re-renders at its real pixel width when the space changes (deferred until an attempt finishes). On very narrow screens an unusually dense bar may scroll sideways inside the score box rather than be squeezed.
+
 ## Running it
 
 It's a static site with no build step:
@@ -63,8 +76,10 @@ To add your own music, drop MusicXML / ABC / kern files into a folder and add it
 
 ## Files
 
-- `index.html` – page and styles
-- `app.js` – notation (VexFlow), audio (Web Audio), tap capture and scoring
+- `index.html` – page structure and icons
+- `styles.css` – design tokens and the four responsive layouts
+- `app.js` – notation (VexFlow), audio (Web Audio), tap capture, scoring and the UI
+- `tests/ui-check.js` – Playwright check of every layout and the practice flow (`node tests/ui-check.js`)
 - `data/rhythms.js` – generated rhythm corpus
 - `vendor/vexflow.js` – VexFlow 4.2.3 (MIT)
 - `audio/piano/` – Salamander Grand Piano V3 by Alexander Holm (CC BY 3.0), MP3 encoding from [@audio-samples](https://github.com/darosh/samples-piano-mp3) (MIT): velocity layers 6, 8, 10 and 13 plus key-release samples

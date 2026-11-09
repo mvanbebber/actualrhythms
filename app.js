@@ -6,6 +6,7 @@
   const TPQ = DATA.tpq;
   const FLAG = { REST: 1, TIE: 2, TRIP: 4, TSTART: 8, TSTOP: 16 };
   const $ = (id) => document.getElementById(id);
+  const root = document.documentElement;
 
   const LEVELS = {
     1: ['Beats', 'Whole, half and quarter values; every attack on a beat.'],
@@ -105,7 +106,7 @@
 
   function pickNext() {
     const p = pool();
-    if (!p.length) { current = null; render(); updatePool(0); return; }
+    if (!p.length) { current = null; lastResult = null; render(); renderOutcome(); syncSettings(); setButtons(); return; }
     let cand;
     for (let tries = 0; tries < 30; tries++) {
       cand = p[Math.floor(Math.random() * p.length)];
@@ -117,7 +118,7 @@
     seen.splice(seenPos + 1); // picking a new one drops anything "forward" of where you were
     seen.push({ item: cand, occ }); if (seen.length > 200) seen.shift();
     seenPos = seen.length - 1;
-    show(cand, occ, p.length);
+    show(cand, occ);
   }
 
   // excerpts already shown this session, for the Left/Right arrow keys
@@ -127,73 +128,113 @@
     if (dir < 0 && seenPos <= 0) return;
     if (dir > 0 && seenPos >= seen.length - 1) { pickNext(); return; }
     seenPos += dir;
-    show(seen[seenPos].item, seen[seenPos].occ, pool().length);
+    show(seen[seenPos].item, seen[seenPos].occ);
   }
 
-  function show(cand, occ, poolSize) {
+  function show(cand, occ) {
     current = { item: cand, occ, flat: flatten(cand), mi: meterInfo(cand.m) };
     lastResult = null;
-    $('result').hidden = true;
-    $('legend').hidden = true;
     render();
-    updatePool(poolSize);
-    if (!S.hideSource) showSourceOnly();
-    piano.prepare(pianoPitches()); // fetch the samples this excerpt needs in the background
+    renderOutcome();
+    syncSettings();
+    setButtons();
+    piano.prepare(pianoPitches()).catch(() => {}); // fetch the samples this excerpt needs in the background
   }
 
+
   // ---------- notation ----------
-  function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+  // Unscaled geometry of one notation row: staff line, then two feedback lanes (one per pass).
+  const ROW_H = 112;
+  const LINE_Y = 52;
+  const LANE_Y = 27;
+  const LANE_GAP = 19;
+  const INK = '#202622';
+  const GRADE_COLOR = { perfect: '#1E7A4C', good: '#2563A8', off: '#B5600B', miss: '#B42318' };
+  let lastRenderW = 0;
+  let pendingRender = false;
+
+  // Rough minimum width a measure needs to stay readable (unscaled px).
+  function measureMinWidth(meas) {
+    let w = 44;
+    meas.forEach((e) => {
+      const code = e[1];
+      w += 27 + (code.match(/d/g) || []).length * 7 + (/^32/.test(code) ? 10 : /^16/.test(code) ? 5 : 0) + (e[2] & FLAG.TRIP ? 4 : 0);
+    });
+    return w;
+  }
+
+  // Break measures into rows (only at barlines) so no measure is squeezed below its minimum.
+  function planRows(item, avail) {
+    const ms = measures(item);
+    const min = ms.map((m, i) => measureMinWidth(m) + (i === 0 ? 36 : 0) + (i === ms.length - 1 ? 16 : 0));
+    const options = [item.b, 2, 1].filter((p, i, a) => p <= item.b && item.b % p === 0 && a.indexOf(p) === i);
+    for (const per of options) {
+      const rows = [];
+      let fits = true;
+      for (let i = 0; i < item.b; i += per) {
+        const idx = []; for (let k = i; k < i + per; k++) idx.push(k);
+        if (idx.reduce((a, k) => a + min[k], 0) > avail) fits = false;
+        rows.push(idx);
+      }
+      if (fits || per === 1) return { rows, min };
+    }
+    return null;
+  }
+
+  function scheduleRender() {
+    if (phase !== 'idle') { pendingRender = true; return; } // never reflow under a running attempt
+    requestAnimationFrame(() => { if (phase === 'idle') render(); else pendingRender = true; });
+  }
 
   function render() {
     const host = $('score');
     host.innerHTML = '';
     layout = null;
+    pendingRender = false;
+    renderMeta();
     if (!current) {
-      host.innerHTML = '<div class="empty">No rhythms match these settings. Turn on another difficulty, time signature or repertoire group.</div>';
-      $('metaChips').innerHTML = '';
-      $('excerptNote').textContent = '';
+      host.innerHTML = `<div class="empty"><p>No rhythms match these settings. Turn on another difficulty, time signature or repertoire group.</p>${
+        root.dataset.layout !== 'wide' ? '<button class="btn" type="button" data-action="settings">Open settings</button>' : ''}</div>`;
+      lastRenderW = host.clientWidth;
       return;
     }
     const { item, mi, flat } = current;
-    $('metaChips').innerHTML =
-      `<span class="chip-static">${item.m}</span><span class="chip-static lvl">Level ${item.l} · ${LEVELS[item.l][0]}</span><span class="chip-static">${item.b} bars</span>`;
-    $('excerptNote').textContent = item.n > 1 ? `This rhythm occurs ${item.n} times in the corpus` : 'Unique to one piece in the corpus';
-
-    const ink = cssVar('--ink');
-    const W = Math.max(280, host.clientWidth || 600);
-    const densest = Math.max(...measures(item).map((m) => m.length));
-    const minBar = Math.max(150, densest * 30 + 40);
-    let perRow = Math.max(1, Math.min(item.b, Math.floor((W - 50) / minBar)));
-    if (item.b === 4 && perRow === 3) perRow = 2;
-    const rows = Math.ceil(item.b / perRow);
-    const rowH = 140; // room for one feedback lane per pass under the staff
+    const W = Math.max(240, Math.floor(host.parentElement.clientWidth || 600));
+    let s = W >= 640 ? 1.2 : 1;
+    let Wl = W / s;
+    const plan = planRows(item, Wl - 8);
+    // a single bar wider than the whole staff (very narrow screens): shrink this excerpt to fit, not below 75%
+    const widest = Math.max(...plan.rows.map((idxs) => idxs.reduce((acc, k) => acc + plan.min[k], 0)));
+    if (widest > Wl - 8) { s = Math.max(0.75, s * (Wl - 8) / widest); Wl = W / s; }
+    // still too wide: let notes sit up to 20% closer than the comfortable estimate...
+    const squeeze = widest > Wl - 8 ? Math.max(0.8, (Wl - 8) / widest) : 1;
+    // ...and beyond that, draw at the needed width and let the score box scroll sideways (never clip)
+    let canvasW = W;
+    if (widest * squeeze > Wl - 8) { canvasW = Math.ceil((widest * squeeze + 8) * s); Wl = canvasW / s; }
+    const H = plan.rows.length * ROW_H;
     const renderer = new VF.Renderer(host, VF.Renderer.Backends.SVG);
-    renderer.resize(W, rows * rowH + 10);
+    renderer.resize(canvasW, Math.ceil(H * s));
     const ctx = renderer.getContext();
-    ctx.setFillStyle(ink); ctx.setStrokeStyle(ink);
+    ctx.scale(s, s); // uniform scale via viewBox; nothing is stretched
+    ctx.setFillStyle(INK); ctx.setStrokeStyle(INK);
     const svg = host.querySelector('svg');
-    svg.setAttribute('viewBox', `0 0 ${W} ${rows * rowH + 10}`);
-    svg.style.width = '100%';
+    svg.setAttribute('aria-hidden', 'true');
 
     const grades = lastResult ? lastResult.byEvent : null;
-    const noteObjs = [];
     const rowsInfo = [];
-    const tsWidth = 34;
-    const usable = W - 8;
-    let evIdx = 0;
-    for (let r = 0; r < rows; r++) {
-      const y = 10 + r * rowH;
-      const first = r * perRow;
-      const count = Math.min(perRow, item.b - first);
-      const extra = r === 0 ? tsWidth : 0;
-      const bw = (usable - extra) / count;
-      const rowInfo = { y, top: y + 18, height: 66, segs: [] };
+    const rowOfMeasure = [];
+    plan.rows.forEach((idxs, r) => {
+      const rowTop = r * ROW_H;
+      const y = rowTop + LINE_Y - 40; // stave line sits 40px below the stave's y (4 spaces of headroom)
+      const sum = idxs.reduce((acc, k) => acc + plan.min[k] * squeeze, 0);
+      const spare = Math.max(0, Wl - 8 - sum);
+      const rowInfo = { y: rowTop, top: rowTop + 14, height: 62, line: rowTop + LINE_Y, segs: [] };
       let x = 4;
-      for (let k = 0; k < count; k++) {
-        const mIdx = first + k;
-        const w = bw + (k === 0 ? extra : 0);
+      idxs.forEach((mIdx, k) => {
+        rowOfMeasure[mIdx] = r;
+        const w = plan.min[mIdx] * squeeze + spare * (plan.min[mIdx] * squeeze / sum);
         const stave = new VF.Stave(x, y, w, { num_lines: 1, spacing_between_lines_px: 10, space_above_staff_ln: 4 });
-        if (r === 0 && k === 0) {
+        if (mIdx === 0) {
           const ts = new VF.TimeSignature(item.m);
           ts.topLine -= 2; ts.bottomLine -= 2; // centre the digits on a one-line staff
           stave.addModifier(ts);
@@ -201,7 +242,7 @@
         stave.setBegBarType(VF.Barline.type.NONE).setEndBarType(VF.Barline.type.NONE);
         stave.setContext(ctx).draw();
         // leave room after a barline so the first note (and any tie into it) doesn't crowd it
-        if (k > 0 || r > 0) stave.setNoteStartX(stave.getNoteStartX() + 14);
+        if (mIdx > 0) stave.setNoteStartX(stave.getNoteStartX() + (k > 0 ? 14 : 6));
         // one-line staves have zero-height barlines, so draw our own
         const ly = stave.getYForLine(0);
         const last = mIdx === item.b - 1;
@@ -217,8 +258,9 @@
         ctx.restore();
 
         const meas = measures(item)[mIdx];
-        const notes = meas.map((e) => {
-          const ev = flat.events[evIdx++];
+        const evs = flat.events.filter((q) => q.mi === mIdx);
+        const notes = meas.map((e, i) => {
+          const ev = evs[i];
           const base = e[1].replace(/d/g, '');
           const dots = (e[1].match(/d/g) || []).length;
           const n = new VF.StaveNote({
@@ -227,12 +269,10 @@
           });
           for (let d = 0; d < dots; d++) VF.Dot.buildAndAttach([n], { all: true });
           const g = grades && grades[ev.idx];
-          if (g) { const c = cssVar('--' + g.grade); n.setStyle({ fillStyle: c, strokeStyle: c }); }
+          if (g) { const c = GRADE_COLOR[g.grade]; n.setStyle({ fillStyle: c, strokeStyle: c }); }
           ev.vf = n;
-          noteObjs.push(n);
           return n;
         });
-        // triplets
         const tuplets = [];
         let tStart = -1;
         meas.forEach((e, i) => {
@@ -244,47 +284,41 @@
         });
         const voice = new VF.Voice({ num_beats: mi.num, beat_value: mi.den }).setMode(VF.Voice.Mode.SOFT);
         voice.addTickables(notes);
-        const groups = VF.Beam.getDefaultBeamGroups(item.m);
-        const beams = VF.Beam.generateBeams(notes, { groups, stem_direction: 1, beam_rests: false });
+        const beams = VF.Beam.generateBeams(notes, { groups: VF.Beam.getDefaultBeamGroups(item.m), stem_direction: 1, beam_rests: false });
         new VF.Formatter().joinVoices([voice]).formatToStave([voice], stave);
         voice.draw(ctx, stave);
         beams.forEach((b) => b.setContext(ctx).draw());
         tuplets.forEach((t) => t.setContext(ctx).draw());
 
-        // x map for this measure: (tick, x) points
+        // tick -> x map for the playhead and feedback marks
         const m0 = mIdx * mi.bar;
-        const pts = [];
-        meas.forEach((e, i) => {
-          const n = notes[i];
-          const cx = (n.getNoteHeadBeginX() + n.getNoteHeadEndX()) / 2;
-          const ev = flat.events.find((q) => q.mi === mIdx && q.ei === i);
-          pts.push([ev.pos, cx]);
-        });
-        pts.push([m0 + mi.bar, x + w - (mIdx === item.b - 1 ? 18 : 6)]);
+        const pts = meas.map((e, i) => [evs[i].pos, (notes[i].getNoteHeadBeginX() + notes[i].getNoteHeadEndX()) / 2]);
+        pts.push([m0 + mi.bar, x + w - (last ? 18 : 6)]);
         rowInfo.segs.push({ t0: m0, t1: m0 + mi.bar, pts });
         x += w;
-      }
+      });
       rowsInfo.push(rowInfo);
-    }
+    });
     // ties (may cross rows)
-    const rowOf = (ev) => Math.floor(ev.mi / perRow);
     flat.events.forEach((ev, i) => {
       if (!(ev.flags & FLAG.TIE) || i + 1 >= flat.events.length) return;
       const nx = flat.events[i + 1];
-      const same = rowOf(ev) === rowOf(nx);
       const mk = (a, b) => new VF.StaveTie({ first_note: a, last_note: b, first_indices: [0], last_indices: [0] }).setContext(ctx).draw();
-      if (same) mk(ev.vf, nx.vf); else { mk(ev.vf, null); mk(null, nx.vf); }
+      if (rowOfMeasure[ev.mi] === rowOfMeasure[nx.mi]) mk(ev.vf, nx.vf); else { mk(ev.vf, null); mk(null, nx.vf); }
     });
-    layout = { rows: rowsInfo, perRow, W, svg };
+    layout = { rows: rowsInfo, svg, s, W };
+    lastRenderW = W;
     if (lastResult) drawTapMarks();
   }
 
   function tickToXY(tick) {
     if (!layout) return null;
+    const lastT = current.flat.total;
     for (const row of layout.rows) {
-      for (const s of row.segs) {
-        if (tick >= s.t0 && tick <= s.t1) {
-          const p = s.pts;
+      for (const sg of row.segs) {
+        // a bar owns [start, end); only the final barline owns its end tick
+        if (tick >= sg.t0 && (tick < sg.t1 || (tick === sg.t1 && sg.t1 === lastT))) {
+          const p = sg.pts;
           for (let i = 0; i < p.length - 1; i++) {
             if (tick >= p[i][0] && tick <= p[i + 1][0]) {
               const f = p[i + 1][0] === p[i][0] ? 0 : (tick - p[i][0]) / (p[i + 1][0] - p[i][0]);
@@ -297,35 +331,30 @@
     return null;
   }
 
+  // dots under each note (one lane per pass, coloured by grade) and tick marks for each tap
   function drawTapMarks() {
     const NS = 'http://www.w3.org/2000/svg';
-    const { svg } = layout;
     const g = document.createElementNS(NS, 'g');
-    const soft = cssVar('--ink-soft');
     const total = current.flat.total;
-    const LANE = 26;
     lastResult.tapTicks.forEach((tk) => {
-      const t = Math.max(0, Math.min(total, tk.tick - tk.pass * total));
-      const p = tickToXY(t);
+      const p = tickToXY(Math.max(0, Math.min(total, tk.tick - tk.pass * total)));
       if (!p) return;
+      const y = p.row.line + LANE_Y + 3 + tk.pass * LANE_GAP;
       const l = document.createElementNS(NS, 'line');
-      const y = p.row.y + 86 + tk.pass * LANE;
-      l.setAttribute('x1', p.x); l.setAttribute('x2', p.x);
-      l.setAttribute('y1', y); l.setAttribute('y2', y + 12);
-      l.setAttribute('stroke', tk.extra ? cssVar('--miss') : soft);
+      l.setAttribute('x1', p.x); l.setAttribute('x2', p.x); l.setAttribute('y1', y); l.setAttribute('y2', y + 10);
+      l.setAttribute('stroke', tk.extra ? GRADE_COLOR.miss : '#646B67');
       l.setAttribute('stroke-width', '2'); l.setAttribute('stroke-linecap', 'round');
       g.appendChild(l);
     });
-    // expected onset dots
     lastResult.onsets.forEach((o) => {
       const p = tickToXY(o.tick - o.pass * total);
       if (!p) return;
       const c = document.createElementNS(NS, 'circle');
-      c.setAttribute('cx', p.x); c.setAttribute('cy', p.row.y + 80 + o.pass * LANE); c.setAttribute('r', 3);
-      c.setAttribute('fill', cssVar('--' + o.grade));
+      c.setAttribute('cx', p.x); c.setAttribute('cy', p.row.line + LANE_Y + o.pass * LANE_GAP); c.setAttribute('r', 3);
+      c.setAttribute('fill', GRADE_COLOR[o.grade]);
       g.appendChild(c);
     });
-    svg.appendChild(g);
+    layout.svg.appendChild(g);
   }
 
   // ---------- audio ----------
@@ -447,13 +476,12 @@
     stopRun(true);
     if (mode !== 'play') {
       const token = ++loadingToken;
-      const btn = mode === 'melody' ? $('btnMelody') : $('btnListen');
-      const label = btn && btn.innerHTML;
-      if (btn) btn.textContent = 'Loading piano…';
+      loadingMode = mode; setButtons();
       try { await piano.prepare(pianoPitches()); } catch (e) { /* play what loaded */ }
-      if (btn && btn.isConnected) btn.innerHTML = label;
-      if (token !== loadingToken || run) return;
-    }
+      if (token !== loadingToken) return;
+      loadingMode = null;
+      if (run || phase !== 'idle') { setButtons(); return; }
+    } else { loadingToken++; loadingMode = null; }
     const c = audio();
     const spt = secPerTick();
     const mi = current.mi;
@@ -475,10 +503,7 @@
     }
     run = { mode, start, t0, spt, beatSec, countBeats, taps: [], endAt: t0 + total * REPEATS * spt + (mode === 'play' ? beatSec * 0.75 : 0.1) };
     phase = 'countin';
-    if (mode === 'play') {
-      lastResult = null; $('legend').hidden = true; render();
-      if (S.hideSource) $('result').hidden = true; else showSourceOnly();
-    }
+    if (mode === 'play' && lastResult) { lastResult = null; render(); renderOutcome(); }
     setButtons();
     tick();
   }
@@ -505,18 +530,21 @@
       const b = Math.floor((now - run.start) / run.beatSec);
       ci.hidden = b < 0; ci.textContent = b >= 0 ? String(b + 1) : '';
       ph.hidden = true;
+      setPadStatus('countin', b >= 0 ? `Count-in ${b + 1} of ${run.countBeats}` : 'Get ready');
     } else {
       ci.hidden = true;
       phase = run.mode === 'play' ? 'playing' : 'listening';
       const total = current.flat.total;
       const tk = (now - run.t0) / run.spt;
+      const pass = Math.min(REPEATS - 1, Math.floor(tk / total));
+      if (run.mode === 'play') setPadStatus('playing', pass === 0 ? 'Tap each note · first time' : 'Tap each note · repeat');
+      else setPadStatus('listening', run.mode === 'melody' ? 'Playing the melody' : 'Listening · taps are not scored');
       const p = tickToXY(tk >= total * REPEATS ? total : tk % total);
-      if (p) {
+      if (p && layout) {
         ph.hidden = false;
-        ph.style.left = (p.x / layout.W * 100) + '%';
-        const scale = $('score').clientWidth / layout.W;
-        ph.style.top = (p.row.top * scale) + 'px';
-        ph.style.height = (p.row.height * scale) + 'px';
+        ph.style.left = (p.x * layout.s) + 'px';
+        ph.style.top = (p.row.top * layout.s) + 'px';
+        ph.style.height = (p.row.height * layout.s) + 'px';
       }
     }
     if (c.currentTime >= run.endAt) { finishRun(); return; }
@@ -528,6 +556,7 @@
     stopAudio();
     run = null; phase = 'idle';
     $('playhead').hidden = true; $('countin').hidden = true;
+    if (pendingRender) render(); // a resize happened during the attempt
     if (!silent) setButtons();
   }
 
@@ -537,13 +566,13 @@
     if (r.mode === 'play') {
       score(r);
       render();
-      showResult();
+      renderOutcome();
     }
     setButtons();
   }
 
   function onTap(ev) {
-    flashPad();
+    flashPad(ev && ev.currentTarget);
     if (phase === 'calibrating') { calib.taps.push(eventAudioTime(ev)); return; }
     if (!run || run.mode !== 'play') {
       if (phase === 'idle' && current) startRun('play');
@@ -605,59 +634,65 @@
     updateSession();
   }
 
+  // ---------- outcome: results + source ----------
   function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+  const icon = (id, cls) => `<svg class="icon${cls ? ' ' + cls : ''}" aria-hidden="true"><use href="#i-${id}"/></svg>`;
 
-  function sourceHTML() {
+  function sourceInner() {
     const { item, occ } = current;
     const [title, composer, folder] = DATA.sources[occ[0]];
     const coll = DATA.collections[folder].label;
     const bar = occ[2];
     const bars = bar != null ? `mm. ${bar}–${bar + item.b - 1}` : '';
-    const part = occ[1] ? `${esc(occ[1])}, ` : '';
+    const generic = /^(musicxml part|part\s*\d*|p\d+|instrument\s*\d*)$/i.test((occ[1] || '').trim());
+    const part = occ[1] && !generic ? `${esc(occ[1])}, ` : '';
     const others = item.o.filter((o) => o !== occ).slice(0, 4).map((o) => {
-      const s = DATA.sources[o[0]];
-      return `<li>${esc(s[0])}${s[1] ? ' (' + esc(s[1]) + ')' : ''}, ${esc(DATA.collections[s[2]].label)}</li>`;
+      const src = DATA.sources[o[0]];
+      return `<li>${esc(src[0])}${src[1] ? ' (' + esc(src[1]) + ')' : ''}, ${esc(DATA.collections[src[2]].label)}</li>`;
     }).join('');
-    const more = item.n > item.o.length ? `<p>Plus ${item.n - item.o.length} more occurrence${item.n - item.o.length > 1 ? 's' : ''} across the corpus.</p>` : '';
+    const extra = item.n - item.o.length;
+    const more = extra > 0 ? `<p>Plus ${extra} more occurrence${extra > 1 ? 's' : ''} across the corpus.</p>` : '';
+    const occurs = item.n > 1 ? `This rhythm occurs ${item.n} times in the corpus.` : 'This rhythm is unique to one piece in the corpus.';
     return `<div class="source">
       <div class="eyebrow">Where this rhythm comes from</div>
       <h3>${esc(title)}${composer ? ` <em>${esc(composer)}</em>` : ''}</h3>
       <p>${part}${bars}, from ${esc(coll)}</p>
-      <div class="transport"><button class="btn" id="btnMelody" type="button">Hear the melody</button></div>
-      ${others ? `<div class="eyebrow" style="margin-top:6px">Also found in</div><ul>${others}</ul>` : ''}${more}
+      <div class="actions"><button class="btn" id="btnMelody" type="button" data-action="melody">${icon('note')}<span>Hear the melody</span></button></div>
+      <p>${occurs}</p>
+      ${others ? `<div class="eyebrow">Also found in</div><ul>${others}</ul>` : ''}${more}
     </div>`;
   }
 
-  function showResult() {
+  function resultHTML() {
     const R = lastResult;
     const ms = (x) => Math.round(x * 1000);
     let verdict;
     if (R.cnt.miss === R.onsets.length) verdict = 'No taps landed near the notes. Tap the pad or press Space on each attack.';
-    else if (Math.abs(R.mean) > 0.03) verdict = `You were ${ms(Math.abs(R.mean))} ms ${R.mean < 0 ? 'early (rushing)' : 'late (dragging)'} on average. If that is steady across attempts, calibrate.`;
+    else if (Math.abs(R.mean) > 0.03) verdict = `You were ${ms(Math.abs(R.mean))} ms ${R.mean < 0 ? 'early (rushing)' : 'late (dragging)'} on average. If that is steady across attempts, calibrate in Advanced settings.`;
     else verdict = `Centered on the beat; your spread was ±${ms(R.sd)} ms.`;
-    const box = $('result');
-    box.innerHTML = `<div class="result-top">
-        <div class="bigscore">${R.pct}<small>%</small></div>
-        <div class="verdict">${verdict}</div>
-      </div>
+    return `<div class="card result">
+      <div class="result-top"><div class="bigscore">${R.pct}<small>%</small></div><p class="verdict">${verdict}</p></div>
       <div class="counts">
-        <span class="count" style="--c:var(--perfect)">${R.cnt.perfect} tight</span>
-        <span class="count" style="--c:var(--good)">${R.cnt.good} close</span>
+        <span class="count" style="--c:var(--perfect)">${R.cnt.perfect} within 35 ms</span>
+        <span class="count" style="--c:var(--good)">${R.cnt.good} within 75 ms</span>
         <span class="count" style="--c:var(--off)">${R.cnt.off} loose</span>
         <span class="count" style="--c:var(--miss)">${R.cnt.miss} missed</span>
-        <span class="count" style="--c:var(--ink-soft)">${R.extra} extra taps</span>
+        <span class="count" style="--c:var(--border-strong)">${R.extra} extra tap${R.extra === 1 ? '' : 's'}</span>
       </div>
-      ${sourceHTML()}`;
-    box.hidden = false;
-    $('legend').hidden = false;
-    $('btnMelody').onclick = () => startRun('melody');
+      <p class="legend">Under the staff: top row is the first time through, bottom row the repeat. Dots are the notes, coloured by timing; tick marks are your taps.</p>
+    </div>`;
   }
 
-  function showSourceOnly() {
-    const box = $('result');
-    box.innerHTML = sourceHTML();
-    box.hidden = false;
-    $('btnMelody').onclick = () => startRun('melody');
+  function renderOutcome() {
+    const box = $('outcome');
+    if (!current) { box.innerHTML = ''; return; }
+    let html = lastResult ? resultHTML() : '';
+    if (S.hideSource && !lastResult) {
+      html += `<details class="locked"><summary>${icon('lock')}<span class="grow">Play to discover the music</span>${icon('chevron', 'chev')}</summary>${sourceInner()}</details>`;
+    } else {
+      html += `<div class="card">${sourceInner()}</div>`;
+    }
+    box.innerHTML = html;
   }
 
   // ---------- calibration ----------
@@ -671,9 +706,11 @@
     for (let i = 0; i < 16; i++) { click(t + i * beat, i % 4 === 0); calib.clicks.push(t + i * beat); }
     phase = 'calibrating';
     $('calibMsg').textContent = 'Listen for 4 clicks, then tap along with the next 12.';
+    $('calibPad').hidden = false;
     setButtons();
     setTimeout(() => {
       phase = 'idle';
+      $('calibPad').hidden = true;
       const errs = [];
       calib.clicks.slice(4).forEach((ct) => {
         let best = null;
@@ -690,113 +727,302 @@
         $('calibMsg').textContent = `Offset set to ${S.latency} ms from ${errs.length} taps.`;
       }
       setButtons();
+      if (pendingRender) render();
     }, (0.4 + 16 * beat + 0.5) * 1000);
   }
 
-  // ---------- UI ----------
-  function flashPad() { const p = $('pad'); p.classList.add('flash'); setTimeout(() => p.classList.remove('flash'), 90); }
+  // ---------- transport, pad, header ----------
+  function flashPad(el) {
+    const p = el && el.id === 'calibPad' ? el : $('pad');
+    p.classList.add('flash'); setTimeout(() => p.classList.remove('flash'), 90);
+  }
+
+  function setBtn(btn, iconId, label, key, iconAfter) {
+    const ic = iconId ? icon(iconId) : '';
+    btn.innerHTML = (iconAfter ? '' : ic) + `<span>${label}</span>` + (iconAfter ? ic : '') + (key ? `<kbd>${key}</kbd>` : '');
+  }
+
+  let loadingMode = null;
+  let padStatusText = '';
+  function setPadStatus(state, text) {
+    const pad = $('pad');
+    if (pad.dataset.state !== state) pad.dataset.state = state;
+    if (text !== padStatusText) { $('padStatus').textContent = text; padStatusText = text; }
+  }
 
   function setButtons() {
-    const busy = phase !== 'idle';
-    $('btnPlay').innerHTML = busy && run ? 'Stop <kbd>Esc</kbd>' : (lastResult ? 'Try again <kbd>Enter</kbd>' : 'Start <kbd>Enter</kbd>');
-    $('btnListen').disabled = busy || !current;
-    $('btnNext').disabled = busy;
-    $('btnCalib').disabled = busy;
-    $('padTitle').textContent = phase === 'calibrating' ? 'Tap with the clicks' : run && run.mode === 'play' ? 'Tap!' : 'Tap here, or press Space';
-    $('padSub').textContent = phase === 'idle'
-      ? 'Start gives you one bar of count-in clicks, then the excerpt plays twice. Tap each note\'s attack; skip rests.'
-      : run && run.mode !== 'play' ? 'Playback only, taps are not scored.' : '';
-    $('tempoInline').textContent = current ? `♩ = ${S.tempo}${current.mi.compound ? ' (dotted)' : ''}` : '';
+    const running = !!run;
+    if (running) setBtn($('btnPlay'), 'stop', 'Stop', 'Esc');
+    else setBtn($('btnPlay'), 'play', lastResult ? 'Try again' : 'Start', 'Enter');
+    $('btnPlay').disabled = !current || phase === 'calibrating';
+    setBtn($('btnListen'), 'speaker', loadingMode === 'listen' ? 'Loading…' : 'Listen', 'L');
+    $('btnListen').disabled = phase !== 'idle' || !current || !!loadingMode;
+    setBtn($('btnNext'), 'next', 'Next', '→', true);
+    $('btnNext').disabled = phase === 'calibrating';
+    $('btnCalib').disabled = phase !== 'idle';
+    const melody = $('btnMelody');
+    if (melody) {
+      melody.querySelector('span').textContent = loadingMode === 'melody' ? 'Loading piano…' : 'Hear the melody';
+      melody.disabled = phase === 'calibrating' || !!loadingMode;
+    }
+    $('tempo').value = S.tempo;
+    const mi = current && current.mi;
+    $('tempoBeat').textContent = mi && mi.compound ? (mi.den === 8 ? 'dotted-quarter beat' : 'dotted-half beat') : '';
+    if (!running) {
+      if (!current) setPadStatus('empty', 'No rhythms match these settings');
+      else if (phase === 'calibrating') setPadStatus('calibrating', 'Calibrating: tap with the clicks');
+      else if (loadingMode) setPadStatus('loading', 'Loading piano…');
+      else setPadStatus(lastResult ? 'done' : 'ready', lastResult ? 'Tap or press Start to try again' : 'Press Start, or just start tapping');
+    }
   }
-
-  function chipGroup(el, entries, key, multi) {
-    el.innerHTML = '';
-    entries.forEach(([val, label, sub]) => {
-      const b = document.createElement('button');
-      b.type = 'button'; b.className = 'chip';
-      b.innerHTML = esc(label) + (sub ? `<small>${sub}</small>` : '');
-      const on = () => (multi ? S[key].includes(val) : S[key] === val);
-      b.setAttribute('aria-pressed', on());
-      b.onclick = () => {
-        if (multi) {
-          const has = S[key].includes(val);
-          if (has && S[key].length === 1) return;
-          S[key] = has ? S[key].filter((v) => v !== val) : S[key].concat([val]);
-        } else S[key] = val;
-        save();
-        [...el.children].forEach((c, i) => c.setAttribute('aria-pressed', multi ? S[key].includes(entries[i][0]) : S[key] === entries[i][0]));
-        pickNext();
-        setButtons();
-      };
-      el.appendChild(b);
-    });
-  }
-
-  function updatePool(n) { $('pool').textContent = `${n.toLocaleString()} real rhythms match · ${DATA.rhythms.length.toLocaleString()} in the corpus`; }
 
   function updateSession() {
     const today = new Date().toDateString();
     const t = history.filter((h) => new Date(h.d).toDateString() === today);
     $('session').textContent = t.length
-      ? `Today: ${t.length} rhythm${t.length > 1 ? 's' : ''} · average ${Math.round(t.reduce((a, h) => a + h.p, 0) / t.length)}%`
-      : 'No attempts yet today';
+      ? `${t.length} practiced today · ${Math.round(t.reduce((a, h) => a + h.p, 0) / t.length)}% average`
+      : 'Nothing practiced yet today';
   }
 
+  function renderMeta() {
+    if (!current) { $('metaChips').innerHTML = ''; return; }
+    const { item } = current;
+    $('metaChips').innerHTML = `<span class="chip">${item.m}</span><span class="chip" title="${LEVELS[item.l][0]}: ${esc(LEVELS[item.l][1])}">Level ${item.l}</span><span class="chip">${item.b} bars</span>`;
+  }
+
+  // ---------- tempo ----------
+  function setTempo(v) {
+    const t = Math.max(40, Math.min(200, Math.round((Number(v) || S.tempo) / 2) * 2));
+    S.tempo = t; save();
+    $('tempo').value = t;
+  }
+  function stepper(btn, delta) {
+    let hold = null; let rep = null;
+    const stop = () => { clearTimeout(hold); clearInterval(rep); hold = rep = null; };
+    btn.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      setTempo(S.tempo + delta);
+      hold = setTimeout(() => { rep = setInterval(() => setTempo(S.tempo + delta), 70); }, 400);
+    });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => btn.addEventListener(ev, stop));
+    btn.addEventListener('click', (e) => { if (e.detail === 0) setTempo(S.tempo + delta); }); // keyboard activation
+  }
+
+  // ---------- settings component ----------
+  const PRIMARY_METERS = ['2/4', '3/4', '4/4', '6/8'].filter((m) => METER_ORDER.includes(m));
+  const MORE_METERS = METER_ORDER.filter((m) => !PRIMARY_METERS.includes(m));
+  const GENRE_SHORT = { folk: 'Folk', chorale: 'Bach', classical: 'Classical', ragtime: 'Ragtime', jazz: 'Jazz' };
+
+  function toggleGroup(el, entries, key, multi) {
+    entries.forEach(({ val, label, aria }) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = label;
+      if (aria) b.setAttribute('aria-label', aria);
+      b.dataset.key = key;
+      b.dataset.val = JSON.stringify(val);
+      b.addEventListener('click', () => {
+        if (multi) {
+          const has = S[key].includes(val);
+          if (has && S[key].length === 1) return; // keep at least one selected
+          S[key] = has ? S[key].filter((v) => v !== val) : S[key].concat([val]);
+        } else S[key] = val;
+        save();
+        syncSettings();
+        if (run) stopRun(true);
+        pickNext();
+        setButtons();
+      });
+      el.appendChild(b);
+    });
+  }
+
+  function syncSettings() {
+    document.querySelectorAll('#settings [data-key]').forEach((b) => {
+      const v = JSON.parse(b.dataset.val);
+      const cur = S[b.dataset.key];
+      b.setAttribute('aria-pressed', Array.isArray(cur) ? cur.includes(v) : cur === v);
+    });
+    const hiddenOn = MORE_METERS.filter((m) => S.meters.includes(m)).length;
+    const more = $('btnMoreMeters');
+    if (more) {
+      more.querySelector('.badge').textContent = hiddenOn && $('metersMore').hidden ? `·${hiddenOn}` : '';
+      more.setAttribute('aria-label', `More time signatures${hiddenOn ? `, ${hiddenOn} selected` : ''}`);
+    }
+    $('metro').setAttribute('aria-checked', String(!!S.metro));
+    $('hideSource').setAttribute('aria-checked', String(!!S.hideSource));
+    $('latency').value = S.latency;
+    const n = pool().length;
+    const levels = S.levels.slice().sort().join(', ');
+    const genres = Object.keys(GENRES).filter((g) => S.genres.includes(g)).map((g) => GENRE_SHORT[g]).join(', ');
+    const meters = METER_ORDER.filter((m) => S.meters.includes(m)).join(', ');
+    $('pool').textContent = `${n.toLocaleString()} of ${DATA.rhythms.length.toLocaleString()} real rhythms match: level ${levels}; ${meters}; ${genres}; ${S.bars} bars.`;
+    const note = $('poolNote');
+    note.textContent = `${n.toLocaleString()} matching`;
+    note.title = `Level ${levels} · ${meters} · ${genres}`;
+    note.setAttribute('aria-label', `${n} matching rhythms. Filters: level ${levels}; ${meters}; ${genres}.` + (root.dataset.layout === 'wide' ? '' : ' Open settings.'));
+  }
+
+  function buildSettings() {
+    toggleGroup($('levels'), Object.keys(LEVELS).map((k) => ({ val: Number(k), label: k, aria: `Level ${k}, ${LEVELS[k][0]}` })), 'levels', true);
+    $('levelHelp').innerHTML = Object.entries(LEVELS).map(([k, v]) => `<dt>${k} ${esc(v[0])}</dt><dd>${esc(v[1])}</dd>`).join('');
+    toggleGroup($('lengths'), [{ val: 2, label: '2 bars' }, { val: 4, label: '4 bars' }], 'bars', false);
+    toggleGroup($('meters'), PRIMARY_METERS.map((m) => ({ val: m, label: m })), 'meters', true);
+    toggleGroup($('metersMore'), MORE_METERS.map((m) => ({ val: m, label: m })), 'meters', true);
+    if (MORE_METERS.length) {
+      const more = document.createElement('button');
+      more.type = 'button'; more.className = 'more'; more.id = 'btnMoreMeters';
+      more.setAttribute('aria-expanded', 'false'); more.setAttribute('aria-controls', 'metersMore');
+      more.innerHTML = `More <span class="badge"></span>${icon('chevron')}`;
+      more.addEventListener('click', () => {
+        const open = $('metersMore').hidden;
+        $('metersMore').hidden = !open;
+        more.setAttribute('aria-expanded', String(open));
+        syncSettings();
+      });
+      $('meters').appendChild(more);
+      if (MORE_METERS.some((m) => S.meters.includes(m))) { /* stays collapsed; the badge says how many are on */ }
+    }
+    toggleGroup($('genres'), Object.keys(GENRES).map((g) => ({ val: g, label: GENRE_SHORT[g], aria: GENRES[g] })), 'genres', true);
+    $('metro').addEventListener('click', () => { S.metro = !S.metro; save(); syncSettings(); });
+    $('hideSource').addEventListener('click', () => { S.hideSource = !S.hideSource; save(); syncSettings(); renderOutcome(); setButtons(); });
+    $('latency').addEventListener('change', (e) => { S.latency = Math.max(-300, Math.min(300, Number(e.target.value) || 0)); save(); syncSettings(); });
+    $('btnCalib').addEventListener('click', calibrate);
+    $('calibPad').addEventListener('pointerdown', (e) => { e.preventDefault(); onTap(e); });
+    syncSettings();
+  }
+
+  // presentation: persistent sidebar (wide) or a modal overlay (slide-over / bottom sheet / full screen)
+  let settingsOpen = false;
+  let lastFocus = null;
+  const isOverlay = () => root.dataset.layout !== 'wide';
+  function setBackgroundInert(on) {
+    document.querySelectorAll('.topbar, .practice, .credits').forEach((el) => { el.inert = on; });
+  }
+  function openSettings() {
+    if (!isOverlay() || settingsOpen) return;
+    lastFocus = document.activeElement;
+    settingsOpen = true;
+    const panel = $('settings');
+    panel.setAttribute('role', 'dialog');
+    panel.setAttribute('aria-modal', 'true');
+    panel.classList.add('open');
+    $('scrim').hidden = false;
+    $('btnSettings').setAttribute('aria-expanded', 'true');
+    setBackgroundInert(true);
+    requestAnimationFrame(() => $('btnCloseSettings').focus());
+  }
+  function closeSettings(restoreFocus = true) {
+    if (!settingsOpen) return;
+    settingsOpen = false;
+    const panel = $('settings');
+    panel.classList.remove('open');
+    panel.removeAttribute('role');
+    panel.removeAttribute('aria-modal');
+    $('scrim').hidden = true;
+    $('btnSettings').setAttribute('aria-expanded', 'false');
+    setBackgroundInert(false);
+    if (restoreFocus && lastFocus && lastFocus.isConnected && !lastFocus.closest('#settings')) lastFocus.focus();
+    else if (restoreFocus) $('btnSettings').focus();
+  }
+  function trapFocus(e) {
+    const items = [...$('settings').querySelectorAll('button:not([disabled]), input:not([disabled]), summary')]
+      .filter((el) => {
+        if (!el.getClientRects().length || el.closest('[hidden]')) return false;
+        // content of a closed <details> can still have boxes (content-visibility), but can't take focus
+        const scope = el.tagName === 'SUMMARY' ? el.parentElement.parentElement : el;
+        return !(scope && scope.closest('details:not([open])'));
+      });
+    if (!items.length) return;
+    const first = items[0]; const last = items[items.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+
+  function applyLayout() {
+    const l = window.computeLayout();
+    if (root.dataset.layout === l) return;
+    const focusInPanel = document.activeElement && document.activeElement.closest && document.activeElement.closest('#settings');
+    root.dataset.layout = l;
+    if (l === 'wide') closeSettings(false);
+    else if (!settingsOpen && focusInPanel) $('btnSettings').focus(); // the sidebar just became a closed overlay
+    syncSettings();
+    if (!current) render();
+  }
+
+  // ---------- wiring (runs once) ----------
   function setupUI() {
-    chipGroup($('levels'), Object.entries(LEVELS).map(([k, v]) => [Number(k), `${k} ${v[0]}`]), 'levels', true);
-    $('levelHelp').innerHTML = Object.entries(LEVELS).map(([k, v]) => `<b>${k}</b> ${esc(v[1])}`).join('<br>');
-    chipGroup($('lengths'), [[2, '2 bars'], [4, '4 bars']], 'bars', false);
-    chipGroup($('meters'), METER_ORDER.map((m) => [m, m]), 'meters', true);
-    chipGroup($('genres'), Object.entries(GENRES), 'genres', true);
-    const tempo = $('tempo');
-    tempo.value = S.tempo; $('tempoOut').textContent = S.tempo;
-    tempo.oninput = () => { S.tempo = Number(tempo.value); $('tempoOut').textContent = S.tempo; save(); setButtons(); };
-    $('metro').checked = S.metro; $('metro').onchange = (e) => { S.metro = e.target.checked; save(); };
-    $('hideSource').checked = S.hideSource;
-    $('hideSource').onchange = (e) => {
-      S.hideSource = e.target.checked; save();
-      if (!lastResult && current) { if (S.hideSource) $('result').hidden = true; else showSourceOnly(); }
-    };
-    $('latency').value = S.latency; $('latency').onchange = (e) => { S.latency = Number(e.target.value) || 0; save(); };
-    $('btnCalib').onclick = calibrate;
-    $('btnPlay').onclick = () => (run ? stopRun() : startRun('play'));
-    $('btnListen').onclick = () => startRun('listen');
-    $('btnNext').onclick = () => { stepHistory(1); setButtons(); };
-    const pad = $('pad');
-    pad.addEventListener('pointerdown', (e) => { e.preventDefault(); onTap(e); });
+    buildSettings();
+    $('tempo').value = S.tempo;
+    $('tempo').addEventListener('change', (e) => setTempo(e.target.value));
+    stepper($('tempoDown'), -2);
+    stepper($('tempoUp'), 2);
+    $('btnPlay').addEventListener('click', () => (run ? stopRun() : startRun('play')));
+    $('btnListen').addEventListener('click', () => startRun('listen'));
+    $('btnNext').addEventListener('click', () => { if (run) stopRun(true); stepHistory(1); setButtons(); });
+    $('btnSettings').addEventListener('click', openSettings);
+    $('btnCloseSettings').addEventListener('click', () => closeSettings());
+    $('scrim').addEventListener('click', () => closeSettings());
+    $('poolNote').addEventListener('click', () => { if (isOverlay()) openSettings(); });
+    // single input path for taps: pointerdown (touch, pen, mouse) plus the keyboard handler below
+    $('pad').addEventListener('pointerdown', (e) => { if (e.button > 0) return; e.preventDefault(); onTap(e); });
+    $('pad').addEventListener('contextmenu', (e) => e.preventDefault());
+    document.addEventListener('click', (e) => {
+      const a = e.target.closest && e.target.closest('[data-action]');
+      if (!a) return;
+      if (a.dataset.action === 'melody') startRun('melody');
+      if (a.dataset.action === 'settings') openSettings();
+    });
     document.addEventListener('keydown', (e) => {
+      const tapKey = e.code === 'Space' || e.code === 'KeyF' || e.code === 'KeyJ';
       const tgt = e.target instanceof Element ? e.target : document.body;
-      if (tgt.matches('input, select, textarea') || e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.repeat) { if (e.code === 'Space') e.preventDefault(); return; }
-      if (e.code === 'Space' || e.code === 'KeyF' || e.code === 'KeyJ') {
-        if (tgt.closest('button') && phase === 'idle') return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (phase === 'calibrating' && tapKey && !tgt.matches('input')) {
+        e.preventDefault(); if (!e.repeat) onTap(e); return;
+      }
+      if (settingsOpen) {
+        if (e.key === 'Escape') { e.preventDefault(); closeSettings(); } else if (e.key === 'Tab') trapFocus(e);
+        return; // no practice shortcuts while the settings dialog is open
+      }
+      if (tgt.matches('input, select, textarea') || tgt.closest('#settings')) return;
+      if (e.repeat) { if (tapKey) e.preventDefault(); return; }
+      if (tapKey) {
+        if (tgt.closest('button, summary') && phase === 'idle') return; // let Space press the focused control
         e.preventDefault(); onTap(e);
       } else if (e.key === 'Enter') {
-        if (tgt.closest('button')) return;
+        if (tgt.closest('button, summary')) return;
         e.preventDefault(); run ? stopRun() : startRun('play');
-      } else if (e.key === 'Escape') stopRun();
-      else if (phase === 'idle' && e.code === 'KeyN') { stepHistory(1); setButtons(); }
-      else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      } else if (e.key === 'Escape') { if (run) stopRun(); }
+      else if (e.key === 'ArrowRight' || e.key === 'ArrowLeft' || (e.code === 'KeyN' && phase === 'idle')) {
+        if (phase === 'calibrating') return;
         e.preventDefault();
-        if (run) stopRun();
-        stepHistory(e.key === 'ArrowRight' ? 1 : -1);
+        if (run) stopRun(true);
+        stepHistory(e.key === 'ArrowLeft' ? -1 : 1);
         setButtons();
-      }
-      else if (phase === 'idle' && e.code === 'KeyL') startRun('listen');
+      } else if (phase === 'idle' && e.code === 'KeyL') startRun('listen');
     });
-    let rt;
-    window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (phase === 'idle') render(); }, 150); });
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    if (mq.addEventListener) mq.addEventListener('change', () => phase === 'idle' && render());
-    new MutationObserver(() => phase === 'idle' && render()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    window.addEventListener('resize', applyLayout);
+    window.addEventListener('orientationchange', applyLayout);
+    // re-render the score whenever its width changes (rotation, sidebar, split view, zoom)
+    if (window.ResizeObserver) {
+      new ResizeObserver(() => {
+        const w = Math.floor($('score').parentElement.clientWidth);
+        if (Math.abs(w - lastRenderW) >= 2) scheduleRender();
+      }).observe($('score').parentElement);
+    } else {
+      window.addEventListener('resize', scheduleRender);
+    }
   }
 
   // read-only handle for automated tests
-  window.actualRhythms = { get current() { return current; }, get run() { return run; }, get result() { return lastResult; }, audio, piano, pianoPitches };
+  window.actualRhythms = {
+    get current() { return current; }, get run() { return run; }, get result() { return lastResult; },
+    get phase() { return phase; }, get layout() { return layout; }, audio, piano, pianoPitches,
+  };
 
   setupUI();
   updateSession();
   pickNext();
   setButtons();
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => phase === 'idle' && render());
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (phase === 'idle') render(); });
 })();

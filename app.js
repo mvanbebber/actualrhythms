@@ -359,11 +359,52 @@
 
   // ---------- audio ----------
   let ac = null;
+  // iOS: web audio is muted by the Silent switch unless the page declares itself a media player.
+  // iOS 17+ has navigator.audioSession for that; older iOS needs an <audio> element playing.
+  function preferPlaybackSession() {
+    try { if (navigator.audioSession && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback'; } catch (e) { /* not supported */ }
+  }
+  preferPlaybackSession();
   function audio() {
     if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
-    if (ac.state === 'suspended') ac.resume();
+    // 'suspended' before the first gesture; 'interrupted' on iOS after a call, Siri or backgrounding
+    if (ac.state !== 'running' && ac.state !== 'closed') ac.resume().catch(() => {});
     return ac;
   }
+  let silentLoop = null;
+  function silentWavURL() {
+    const n = 4000; // half a second of 8 kHz, 8-bit silence
+    const buf = new ArrayBuffer(44 + n); const v = new DataView(buf);
+    const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    str(0, 'RIFF'); v.setUint32(4, 36 + n, true); str(8, 'WAVE'); str(12, 'fmt ');
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true);
+    str(36, 'data'); v.setUint32(40, n, true);
+    for (let i = 0; i < n; i++) v.setUint8(44 + i, 128);
+    return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+  }
+  // Runs inside every user gesture (capture phase) until audio is running, so the
+  // gesture that presses Start or taps the pad is also the one that unlocks sound.
+  function unlockAudio() {
+    preferPlaybackSession();
+    const c = audio();
+    if (!unlockAudio.primed) {
+      unlockAudio.primed = true;
+      try { // a one-sample silent buffer started within the gesture (older iOS unlock)
+        const src = c.createBufferSource(); src.buffer = c.createBuffer(1, 1, 22050); src.connect(c.destination); src.start(0);
+      } catch (e) { /* ignore */ }
+    }
+    const isIOS = /iP(hone|ad|od)/.test(navigator.platform) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (isIOS && !navigator.audioSession && !silentLoop) {
+      silentLoop = new Audio(silentWavURL());
+      silentLoop.loop = true; silentLoop.setAttribute('playsinline', ''); silentLoop.setAttribute('x-webkit-airplay', 'deny');
+      silentLoop.play().catch(() => { silentLoop = null; });
+    }
+  }
+  ['pointerdown', 'touchend', 'click', 'keydown'].forEach((t) => document.addEventListener(t, () => {
+    if (!ac || ac.state !== 'running' || !unlockAudio.primed) unlockAudio();
+  }, { capture: true, passive: true }));
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && ac && ac.state !== 'running') ac.resume().catch(() => {}); });
   let scheduled = [];
   let audioGen = 0; // bumped on stop so late-loading notes don't sound
   function click(t, accent, quiet) {

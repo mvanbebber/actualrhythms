@@ -34,7 +34,7 @@
   }
   const S = Object.assign({
     tempo: 80, levels: [1, 2], bars: 2, meters: ['2/4', '3/4', '4/4', '6/8'],
-    genres: Object.keys(GENRES), metro: true, hideSource: false, latency: 0, tapSound: true, silentMode: true,
+    genres: Object.keys(GENRES), metro: true, hideSource: false, latency: 0, tapSound: true, silentMode: true, lowLatency: true,
   }, saved, { v: SETTINGS_VERSION });
   const save = () => store.set('settings', S);
 
@@ -464,9 +464,31 @@
         const src = c.createBufferSource(); src.buffer = c.createBuffer(1, 1, 22050); src.connect(c.destination); src.start(0);
       } catch (err) { /* ignore */ }
     }
+    if (c.state === 'running') startKeepAlive(); else ensureRunning().then((ok) => ok && startKeepAlive());
     updateSoundStatus();
   }
   ['touchend', 'click', 'keydown', 'mousedown'].forEach((t) => document.addEventListener(t, onActivation, { capture: true, passive: true }));
+
+  // Keep the audio engine 'playing' (an inaudible -120 dB constant) while the page is open.
+  // Safari drops to a large power-saving audio buffer whenever a page goes quiet, so the first
+  // sound after silence (every tap click) comes out late; a continuously playing engine keeps
+  // the small, low-latency buffer.
+  let keepAlive = null;
+  function startKeepAlive() {
+    if (keepAlive || !S.lowLatency || !ac || ac.state !== 'running' || document.hidden || !ac.createConstantSource) return;
+    try {
+      const src = ac.createConstantSource();
+      src.offset.value = 1e-6;
+      src.connect(ac.destination);
+      src.start();
+      keepAlive = src;
+    } catch (e) { keepAlive = null; }
+  }
+  function stopKeepAlive() {
+    if (!keepAlive) return;
+    try { keepAlive.stop(); keepAlive.disconnect(); } catch (e) { /* already stopped */ }
+    keepAlive = null;
+  }
 
   function updateSoundStatus() {
     const el = document.getElementById('soundStatus');
@@ -476,13 +498,15 @@
       ac ? `reported delay ${Math.round(((ac.baseLatency || 0) + (ac.outputLatency || 0)) * 1000)} ms` + (ac.outputLatency ? '' : ' (output part not reported)') : null,
       navigator.audioSession ? `iOS audio session: ${navigator.audioSession.type}` : null,
       IS_IOS ? `Silent-mode workaround: ${!S.silentMode ? 'switched off' : silentLoopPlaying ? 'on' : 'waiting for a tap'}` : null,
+      `Low-latency mode: ${!S.lowLatency ? 'off' : keepAlive ? 'on' : 'waiting for a tap'}`,
     ].filter(Boolean);
     el.textContent = parts.join(' · ');
   }
 
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) { if (silentLoop) silentLoop.pause(); return; } // don't hold the audio session in the background
-    if (ac && ac.state !== 'running') ac.resume().catch(() => {});
+    if (document.hidden) { if (silentLoop) silentLoop.pause(); stopKeepAlive(); return; } // don't hold audio in the background
+    if (ac && ac.state !== 'running') ac.resume().then(startKeepAlive).catch(() => {});
+    else startKeepAlive();
   });
   let scheduled = [];
   let audioGen = 0; // bumped on stop so late-loading notes don't sound
@@ -1038,6 +1062,7 @@
     }
     $('metro').setAttribute('aria-checked', String(!!S.metro));
     $('tapSoundSw').setAttribute('aria-checked', String(!!S.tapSound));
+    $('lowLatencySw').setAttribute('aria-checked', String(!!S.lowLatency));
     $('silentSw').setAttribute('aria-checked', String(!!S.silentMode));
     $('hideSource').setAttribute('aria-checked', String(!!S.hideSource));
     $('latency').value = S.latency;
@@ -1075,6 +1100,11 @@
     toggleGroup($('genres'), Object.keys(GENRES).map((g) => ({ val: g, label: GENRE_SHORT[g], aria: GENRES[g] })), 'genres', true);
     $('metro').addEventListener('click', () => { S.metro = !S.metro; save(); syncSettings(); });
     $('tapSoundSw').addEventListener('click', () => { S.tapSound = !S.tapSound; save(); syncSettings(); });
+    $('lowLatencySw').addEventListener('click', () => {
+      S.lowLatency = !S.lowLatency; save(); syncSettings();
+      if (S.lowLatency) startKeepAlive(); else stopKeepAlive();
+      updateSoundStatus();
+    });
     $('silentSw').addEventListener('click', () => {
       S.silentMode = !S.silentMode; save(); syncSettings();
       if (S.silentMode) startSilentLoop(); else if (silentLoop) { silentLoop.pause(); silentLoopPlaying = false; }

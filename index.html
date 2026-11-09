@@ -141,6 +141,11 @@
               <span id="tapSoundLabel">Click when I tap</span>
               <button class="switch" id="tapSoundSw" type="button" role="switch" aria-labelledby="tapSoundLabel"></button>
             </div>
+            <div class="switch-row">
+              <span id="lowLatencyLabel">Low-latency mode</span>
+              <button class="switch" id="lowLatencySw" type="button" role="switch" aria-labelledby="lowLatencyLabel" aria-describedby="lowLatencyHelp"></button>
+            </div>
+            <p class="help" id="lowLatencyHelp">Keeps the audio engine awake with an inaudible signal so tap clicks aren't delayed. Uses a little more battery.</p>
             <div class="switch-row" id="silentRow">
               <span id="silentLabel">Play sound in Silent mode (iPhone, iPad)</span>
               <button class="switch" id="silentSw" type="button" role="switch" aria-labelledby="silentLabel" aria-describedby="silentHelp"></button>
@@ -209,6 +214,6 @@
 
 <script src="vendor/vexflow.js"></script>
 <script src="data/rhythms.js"></script>
-<script src="app.js?v=15"></script>
+<script src="app.js?v=16"></script>
 </body>
 </html>

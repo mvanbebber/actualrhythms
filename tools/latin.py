@@ -35,6 +35,20 @@ PATTERNS = [
      'The seven-stroke bell pattern of Afro-Cuban 6/8 and much West African music.'),
     ('6/8 clave', '12/8', ['q q qd q qd', 'q q qd q qd'], 'Claves', 'Cuba (West African roots)', 'traditional', [84],
      'Five strokes taken from the 6/8 bell pattern.'),
+    ('Cáscara (3-2)', '4/4', ['8 8r 8 8 8r 8 8r 8', '8 8r 8 8r 8 8 8r 8'], 'Timbales (shell)', 'Cuba', 'traditional', [81],
+     'The salsa timbalero\'s shell pattern against 3-2 clave (one common version; players vary it).'),
+    ('Cáscara (2-3)', '4/4', ['8 8r 8 8r 8 8 8r 8', '8 8r 8 8 8r 8 8r 8'], 'Timbales (shell)', 'Cuba', 'traditional', [81],
+     'Cáscara against 2-3 clave (one common version; players vary it).'),
+    ('Reggaetón (dembow)', '4/4', ['8dr 16 8r 16 16r 8dr 16 8r 16 16r', '8dr 16 8r 16 16r 8dr 16 8r 16 16r'], 'Snare', 'Puerto Rico (Jamaican roots)', '1990s',
+     [74], 'The dembow snare over a four-on-the-floor kick: the a of 1, and of 2, a of 3, and of 4.'),
+    ('Samba bass drum', '2/4', ['8d 16 8d 16', '8d 16 8d 16'], 'Bass drum (surdo feel)', 'Brazil', 'traditional', [36],
+     'Each beat is anticipated by a sixteenth: the push under samba.'),
+    ('Bossa nova bass', '4/4', ['qd 8 qd 8', 'qd 8 qd 8'], 'Bass', 'Brazil', 'late 1950s', [36, 43, 43, 36],
+     'Root on 1, fifth on 3, each anticipated by the eighth before.'),
+    ('Sesquialtera', '6/8', ['qd qd', 'q q q'], 'Guitar, bombo, harp', 'Mexico, Argentina, Venezuela (Spanish roots)', 'traditional',
+     [55, 60, 55, 59, 62], 'Two beats of 6/8 against three of 3/4: the hemiola of huapango, chacarera and joropo.'),
+    ('Milonga (3-3-2)', '2/4', ['8d 8d 8', '8d 8d 8'], 'Bass, guitar', 'Argentina, Uruguay', '19th century', [43, 43, 50],
+     'The 3-3-2 of the milonga, an ancestor of the tango: tresillo written in 2/4.'),
 ]
 
 

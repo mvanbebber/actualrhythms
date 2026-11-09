@@ -277,9 +277,9 @@ async function performTaps(p, { lateMs = 0, skipFirst = 0 } = {}) {
       for (let i = 4; i < 16; i++) setTimeout(() => document.getElementById('calibPad').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0 })),
         ts.performanceTime + (t0 + i * beat + 0.02 - ts.contextTime) * 1000 - performance.now());
     });
-    await p.waitForFunction(() => /Offset set to|Only/.test(document.getElementById('calibMsg').textContent), null, { timeout: 20000 });
+    await p.waitForFunction(() => /Offset for .* set to|Only/.test(document.getElementById('calibMsg').textContent), null, { timeout: 20000 });
     console.log('  ' + await p.textContent('#calibMsg'));
-    check(/Offset set to/.test(await p.textContent('#calibMsg')), 'calibration did not measure an offset');
+    check(/Offset for .* set to/.test(await p.textContent('#calibMsg')), 'calibration did not measure an offset');
     check(p.errors.length === 0, 'page errors: ' + p.errors.join(' | '));
     await p.screenshot({ path: path.join(OUT, 'laptop-advanced.png') });
     await p.context().close();

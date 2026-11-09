@@ -36,6 +36,16 @@
     tempo: 80, levels: [1, 2], bars: 2, meters: ['2/4', '3/4', '4/4', '6/8'],
     genres: Object.keys(GENRES), metro: true, hideSource: false, latency: 0, tapSound: true, silentMode: true, lowLatency: true,
   }, saved, { v: SETTINGS_VERSION });
+  // separate saved timing offsets per output: Bluetooth headphones add 150-250 ms
+  if (!S.offsets || typeof S.offsets !== 'object') {
+    const old = Number(S.latency) || 0;
+    S.offsets = { speaker: 0, bluetooth: 0 };
+    if (old >= 80) { S.offsets.bluetooth = old; S.output = 'bluetooth'; } else { S.offsets.speaker = old; S.output = S.output || 'speaker'; }
+  }
+  if (S.output !== 'speaker' && S.output !== 'bluetooth') S.output = 'speaker';
+  delete S.latency;
+  const latencyMs = () => Number(S.offsets[S.output]) || 0;
+  const OUTPUT_NAME = { speaker: 'speaker or wired headphones', bluetooth: 'Bluetooth headphones' };
   const save = () => store.set('settings', S);
 
   const meterCounts = {};
@@ -781,7 +791,7 @@
       if (phase === 'idle' && current) startRun('play');
       return;
     }
-    run.taps.push(heard - S.latency / 1000);
+    run.taps.push(heard - latencyMs() / 1000);
   }
 
   // ---------- scoring ----------
@@ -933,9 +943,9 @@
       } else {
         errs.sort((a, b) => a - b);
         const med = errs[Math.floor(errs.length / 2)];
-        S.latency = Math.round(med * 1000 / 5) * 5;
-        $('latency').value = S.latency; save();
-        $('calibMsg').textContent = `Offset set to ${S.latency} ms from ${errs.length} taps.`;
+        S.offsets[S.output] = Math.round(med * 1000 / 5) * 5;
+        $('latency').value = latencyMs(); save(); syncSettings();
+        $('calibMsg').textContent = `Offset for ${OUTPUT_NAME[S.output]} set to ${latencyMs()} ms from ${errs.length} taps.`;
       }
       setButtons();
       if (pendingRender) render();
@@ -1024,7 +1034,7 @@
   const MORE_METERS = METER_ORDER.filter((m) => !PRIMARY_METERS.includes(m));
   const GENRE_SHORT = { folk: 'Folk', chorale: 'Bach', classical: 'Classical', ragtime: 'Ragtime', jazz: 'Jazz' };
 
-  function toggleGroup(el, entries, key, multi) {
+  function toggleGroup(el, entries, key, multi, repick = true) {
     entries.forEach(({ val, label, aria }) => {
       const b = document.createElement('button');
       b.type = 'button';
@@ -1040,6 +1050,7 @@
         } else S[key] = val;
         save();
         syncSettings();
+        if (!repick) return; // e.g. switching headphones keeps the current rhythm
         if (run) stopRun(true);
         pickNext();
         setButtons();
@@ -1065,7 +1076,8 @@
     $('lowLatencySw').setAttribute('aria-checked', String(!!S.lowLatency));
     $('silentSw').setAttribute('aria-checked', String(!!S.silentMode));
     $('hideSource').setAttribute('aria-checked', String(!!S.hideSource));
-    $('latency').value = S.latency;
+    $('latency').value = latencyMs();
+    $('latencyFor').textContent = `for ${OUTPUT_NAME[S.output]}`;
     const n = pool().length;
     const levels = S.levels.slice().sort().join(', ');
     const genres = Object.keys(GENRES).filter((g) => S.genres.includes(g)).map((g) => GENRE_SHORT[g]).join(', ');
@@ -1112,7 +1124,8 @@
     });
     if (!IS_IOS) { $('silentRow').hidden = true; $('silentHelp').hidden = true; }
     $('hideSource').addEventListener('click', () => { S.hideSource = !S.hideSource; save(); syncSettings(); renderOutcome(); setButtons(); });
-    $('latency').addEventListener('change', (e) => { S.latency = Math.max(-300, Math.min(300, Number(e.target.value) || 0)); save(); syncSettings(); });
+    $('latency').addEventListener('change', (e) => { S.offsets[S.output] = Math.max(-300, Math.min(500, Number(e.target.value) || 0)); save(); syncSettings(); });
+    toggleGroup($('outputs'), [{ val: 'speaker', label: 'Speaker / wired' }, { val: 'bluetooth', label: 'Bluetooth' }], 'output', false, false);
     $('btnCalib').addEventListener('click', calibrate);
     $('btnTestSound').addEventListener('click', async () => {
       const ok = await ensureRunning();

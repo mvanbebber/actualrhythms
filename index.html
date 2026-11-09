@@ -130,6 +130,11 @@
           <span id="metroLabel">Metronome</span>
           <button class="switch" id="metro" type="button" role="switch" aria-labelledby="metroLabel"></button>
         </div>
+        <fieldset>
+          <legend>Listening on</legend>
+          <div class="seg" id="outputs"></div>
+          <p class="help">Each has its own timing offset. Bluetooth headphones add about 150–250 ms; calibrate once with each in Advanced settings.</p>
+        </fieldset>
         <details class="disclosure" id="advanced">
           <summary>Advanced settings<svg class="icon chev" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
           <div class="advanced-body">
@@ -158,10 +163,10 @@
             </div>
             <div class="calib">
               <h3>Timing calibration</h3>
-              <p class="help">Bluetooth audio adds delay. Calibrate plays 16 clicks; tap along with the last 12 and the offset is measured for you.</p>
+              <p class="help">Calibrate plays 16 clicks; tap along with the last 12 and the offset is measured for whatever you're listening on (see Listening on).</p>
               <div class="calib-row">
                 <label for="latency">Offset</label>
-                <input id="latency" type="number" step="5" min="-300" max="300" inputmode="numeric"> <span class="help">ms</span>
+                <input id="latency" type="number" step="5" min="-300" max="500" inputmode="numeric"> <span class="help">ms <span id="latencyFor"></span></span>
                 <button class="btn" id="btnCalib" type="button">Calibrate</button>
               </div>
               <button class="calib-pad" id="calibPad" type="button" hidden>Tap with the clicks</button>
@@ -214,6 +219,6 @@
 
 <script src="vendor/vexflow.js"></script>
 <script src="data/rhythms.js"></script>
-<script src="app.js?v=16"></script>
+<script src="app.js?v=17"></script>
 </body>
 </html>

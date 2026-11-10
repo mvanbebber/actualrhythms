@@ -6,6 +6,8 @@ every bar, two if it spans two). Measures use the app's compact encoding:
   w h q 8 16 (whole..sixteenth), d = dot, r = rest, ~ = tied to the next note.
 
 Notation rules, checked by check_notation() at build time:
+  * simplest values: sixteenth notes and rests appear only in a beat that has an attack on its
+    e or a; otherwise a note lasts until the next attack or the end of its beat;
   * the imaginary barline: in 4/4 and 12/8 nothing (note or rest) crosses the middle of the bar,
     except a note that starts on beat 1 and fills the half (half, dotted half, whole);
   * a note or rest that starts off the beat never runs into the next beat; it is split and tied
@@ -27,9 +29,9 @@ PATTERNS = [
      'Rumba clave starting from its 2 side.'),
     ('Bossa nova clave', '4/4', ['qd 8 qr q', 'qr q 8r 8 qr'], 'Rim click', 'Brazil', 'late 1950s', [76],
      'The son clave with its last stroke moved to the and of 3.'),
-    ('Cáscara (3-2)', '4/4', ['8 8r 8 8 8r 8 8r 8', '8 8r 8 8r 8 8 8r 8'], 'Timbales (shell)', 'Cuba', 'traditional', [81],
+    ('Cáscara (3-2)', '4/4', ['q 8 8 8r 8 8r 8', 'q q 8 8 8r 8'], 'Timbales (shell)', 'Cuba', 'traditional', [81],
      "The salsa timbalero's shell pattern against 3-2 clave (one common version; players vary it)."),
-    ('Cáscara (2-3)', '4/4', ['8 8r 8 8r 8 8 8r 8', '8 8r 8 8 8r 8 8r 8'], 'Timbales (shell)', 'Cuba', 'traditional', [81],
+    ('Cáscara (2-3)', '4/4', ['q q 8 8 8r 8', 'q 8 8 8r 8 8r 8'], 'Timbales (shell)', 'Cuba', 'traditional', [81],
      'Cáscara against 2-3 clave (one common version; players vary it).'),
     ('Tresillo', '4/4', ['qd 8~ q q'], 'Bass, bell', 'Cuba', 'traditional', [43, 43, 50],
      'Three-three-two: the cell under habanera, tango, mambo and much of Latin music.'),
@@ -43,11 +45,11 @@ PATTERNS = [
      '"One, two, cha-cha-chá" from Enrique Jorrín\'s danzón-chá.'),
     ('Tumbao', '4/4', ['qr 8r 8~ q q'], 'Bass', 'Cuba', 'traditional', [43, 48],
      'The anticipated bass of son and salsa: on the and of 2 (held through 3) and on 4.'),
-    ('6/8 bell (bembé)', '12/8', ['8 8r 8 8r 8 8 8r 8 8r 8 8r 8'], 'Bell', 'Cuba (West African roots)', 'traditional', [79],
+    ('6/8 bell (bembé)', '12/8', ['q 8 8r 8 8 8r q q 8'], 'Bell', 'Cuba (West African roots)', 'traditional', [79],
      'The seven-stroke bell pattern of Afro-Cuban 6/8 and much West African music.'),
-    ('6/8 clave', '12/8', ['8 8r 8 8r 8 8r 8r 8 8r 8 qr'], 'Claves', 'Cuba (West African roots)', 'traditional', [84],
+    ('6/8 clave', '12/8', ['q 8 8r q 8r q qd'], 'Claves', 'Cuba (West African roots)', 'traditional', [84],
      'Five strokes taken from the 6/8 bell pattern.'),
-    ('Reggaetón (dembow)', '4/4', ['8dr 16 8r 16 16r 8dr 16 8r 16 16r'], 'Snare', 'Puerto Rico (Jamaican roots)', '1990s', [74],
+    ('Reggaetón (dembow)', '4/4', ['8dr 16 8r 8 8dr 16 8r 8'], 'Snare', 'Puerto Rico (Jamaican roots)', '1990s', [74],
      'The dembow snare over a four-on-the-floor kick: the a of 1, and of 2, a of 3, and of 4.'),
     ('Samba bass drum', '2/4', ['8d 16 8d 16'], 'Bass drum (surdo feel)', 'Brazil', 'traditional', [36],
      'Each beat is anticipated by a sixteenth: the push under samba.'),
@@ -100,6 +102,20 @@ def check_notation(name, meter, measure):
         pos = end
     if pos != bar:
         raise ValueError(f'{name}: bar holds {pos} ticks, {meter} needs {bar}')
+    # simplest values: no sixteenth-based value in a beat whose attacks all sit on the eighth grid
+    attacks, events, pos = [], [], 0
+    for i, (ticks, code, flags) in enumerate(measure):
+        if not flags & FLAG_REST and not (i and measure[i - 1][2] & FLAG_TIE):
+            attacks.append(pos)
+        events.append((pos, pos + ticks, code, flags))
+        pos += ticks
+    for b0 in range(0, bar, beat):
+        if all(a % 12 == 0 for a in attacks if b0 <= a < b0 + beat):
+            for start, end, code, flags in events:
+                piece = (max(start, b0), min(end, b0 + beat))
+                if piece[0] < piece[1] and ((piece[1] - piece[0]) % 12 or piece[0] % 12):
+                    raise ValueError(f'{name} ({meter}): beat at tick {b0} has no sixteenth attacks, so "{code}" '
+                                     'should be written with eighths or longer')
 
 
 def latin_windows():

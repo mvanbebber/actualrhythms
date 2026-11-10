@@ -128,7 +128,7 @@ def origin_and_date(src):
     if folder == 'essenFolksong':
         date = src.get('s_year') and f"published {src['s_year']}" or ESSEN_FILE_DATES.get(src.get('file'))
         return essen_origin(src.get('origin_raw')), date
-    if folder in ('wjd', 'joplinrags', 'openewld', 'latin'):  # metadata supplied by the source itself
+    if folder in ('wjd', 'joplinrags', 'openewld', 'latin', 'parkerbook'):  # metadata supplied by the source itself
         return src.get('origin'), src.get('date')
     if folder in COLLECTIONS:
         return COLLECTIONS[folder]

@@ -974,7 +974,8 @@
     const where = [origin, date].filter(Boolean).map(esc).join(' · ');
     // skip the collection when it adds nothing: Essen (origin says more) or a single-composer folder ('Beethoven')
     const surname = (composer || '').trim().split(/\s+/).pop();
-    const redundant = HIDE_COLLECTION.has(folder) || (surname && coll.includes(surname));
+    // (a collection that credits someone, like a transcriber, always shows)
+    const redundant = folder !== 'parkerbook' && (HIDE_COLLECTION.has(folder) || (surname && coll.includes(surname)));
     const from = redundant ? '' : `, from ${esc(coll)}`;
     const others = item.o.filter((o) => o[0] !== occ[0]).slice(0, 4).map((o) => {
       const src = DATA.sources[o[0]];

@@ -44,6 +44,7 @@ COLLECTIONS = {
     'liliuokalani': ('Liliʻuokalani', 'classical'),
     'johnson_j_r': ('J. Rosamond Johnson', 'classical'),
     'leadSheet': ('Lead sheets', 'classical'),
+    'parkerbook': ('Charlie Parker transcriptions by Michael Van Bebber', 'jazz'),
     'wjd': ('Weimar Jazz Database', 'jazz'),
     'joplinrags': ("Scott Joplin's rags (Sapp edition)", 'ragtime'),
     'openewld': ('OpenEWLD lead sheets', 'popular'),
@@ -59,12 +60,20 @@ class Skip(Exception):
     pass
 
 
+def snap_ticks(ql):
+    """Quarter lengths -> ticks. Some exporters (Sibelius) write a triplet eighth as 0.33203125
+    rather than 1/3 and make up the difference on the last note; within a fifth of a tick, round."""
+    t = Fraction(ql) * TPQ
+    r = round(t)
+    return Fraction(r) if abs(t - r) <= Fraction(1, 5) else t
+
+
 def event_of(n):
     """Return [ticks, code, flags, midi] for a note/chord/rest, or raise Skip."""
     d = n.duration
     if d.isGrace or n.quarterLength == 0:
         return None
-    ticks = Fraction(n.quarterLength) * TPQ
+    ticks = snap_ticks(n.quarterLength)
     if ticks.denominator != 1:
         raise Skip('ticks')
     if d.type not in TYPE_CODE or d.dots > 2 or len(d.components) > 1:
@@ -117,7 +126,9 @@ def voice_events(src, bar_ticks):
     evs, tie_ins = [], []
     pos = 0
     for n in src.notesAndRests:
-        if Fraction(n.offset) * TPQ != pos:
+        if n.duration.isGrace or n.quarterLength == 0:
+            continue  # grace notes, chord symbols
+        if snap_ticks(n.offset) != pos:
             raise Skip('gap/overlap')
         r = event_of(n)
         if r is None:
@@ -276,6 +287,37 @@ def score_tempos(s):
     return at
 
 
+def process_parker(path):
+    """One Charlie Parker transcription (tools/parker.py): the concert-pitch first staff only,
+    each excerpt labelled head, solo or the other player from the score's text marks."""
+    import parker
+    try:
+        s = next(iter_scores(path))
+        md = s.metadata
+        c = parker.credits(md.title if md else '', md.composer if md else '')
+        c['title'] = re.sub(r'\s+No\.\s*(\d)$', r' (No. \1)', c['title'])
+        # the concert-pitch staff with the most notes (counterpoint heads put the second line on its
+        # own staff; the bass-clef trombone copy is skipped)
+        concert = [p for p in s.parts if p.getInstrument().transposition is None
+                   and 'trombone' not in (p.getInstrument().instrumentName or '').lower()] or list(s.parts[:1])
+        part = max(concert, key=lambda p: len(p.recurse().notes))
+        labels = parker.section_labels(part)
+        tempo_at = score_tempos(s)
+        bar_offsets = {m.number: float(m.offset) for m in part.getElementsByClass('Measure')}
+        out = []
+        for w in extract_part(part, 'Alto sax', c['title'], c['composer'], parker.FOLDER):
+            bar = w['src']['bar']
+            w['src'].update({'part': labels.get(bar, 'Alto sax'), 'origin': c['origin'], 'date': c['date'],
+                             'note': c['note'], 'file': os.path.basename(path), 'year': c['year']})
+            off = bar_offsets.get(bar)
+            w['tempo'] = tempo_at(off) if off is not None else None
+            out.append(w)
+        return out
+    except Exception as e:
+        print(f'parker: {os.path.basename(path)}: {e}', file=sys.stderr)
+        return []
+
+
 def process_file(args):
     path, folder = args[0], args[1]
     meta = args[2] if len(args) > 2 else None
@@ -432,6 +474,8 @@ def main():
                     help='clone of https://github.com/00sapo/OpenEWLD; adds US-public-domain popular songs')
     ap.add_argument('--openewld-all', action='store_true',
                     help='with --openewld: keep every song, not only US public domain (requires permission)')
+    ap.add_argument('--parker', metavar='DIR',
+                    help='MusicXML exports of Michael Van Bebber\'s Charlie Parker transcriptions (used with permission)')
     ap.add_argument('--wjd', metavar='DIR',
                     help="jazzodata's data/ folder (git clone https://github.com/klausfrieler/jazzodata); adds jazz solos")
     args = ap.parse_args()
@@ -502,6 +546,29 @@ def main():
                 w['tempo'] = src.get('tempo')
                 found.append(w)
         print(f'jazz: {len(found) - n0} windows from the Weimar Jazz Database', file=sys.stderr)
+
+    if args.parker:
+        import glob, parker
+        paths = sorted(glob.glob(os.path.join(args.parker, '*.musicxml')) + glob.glob(os.path.join(args.parker, '*.mxl')))
+        book = []
+        with Pool(args.jobs) as pool:
+            for res in pool.imap_unordered(process_parker, paths):
+                book.extend(res)
+        # the same recorded solo from the Weimar Jazz Database gives way to the book's transcription
+        tunes = {}
+        for w in book:
+            tunes.setdefault(parker.norm_title(w['src']['title']), set()).add(w['src'].get('year'))
+        def replaced(w):
+            s = w['src']
+            if s['folder'] != 'wjd' or s['composer'] != 'Charlie Parker':
+                return False
+            years = tunes.get(parker.norm_title(s['title']))
+            m = re.search(r'(19\d\d)', s.get('date') or '')
+            return years is not None and (None in years or (m and int(m.group(1)) in years))
+        gone = sorted({w['src']['title'] for w in found if replaced(w)})
+        found = [w for w in found if not replaced(w)]
+        found.extend(book)
+        print(f'parker: {len(book)} windows from {len(paths)} transcriptions; replaces WJD solos: {", ".join(gone)}', file=sys.stderr)
 
     # a triplet group must start on its own grid (a beat for triplet eighths, half a beat for triplet
     # sixteenths, half a bar for triplet quarters); one that starts off the beat and runs into the next
@@ -683,7 +750,8 @@ def main():
     data = {
         'version': 3, 'tpq': TPQ,
         'occurrences': occ_url,
-        'collections': {k: {'label': v[0], 'genre': v[1]} for k, v in COLLECTIONS.items()},
+        'collections': {k: {'label': v[0], 'genre': v[1]} for k, v in COLLECTIONS.items()
+                        if any(src[2] == k for src in sources)},  # only collections with pieces in this build
         'sources': sources,
         'rhythms': items,
     }

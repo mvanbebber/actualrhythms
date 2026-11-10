@@ -33,15 +33,19 @@
     get(k, d) { try { const v = localStorage.getItem('rr.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem('rr.' + k, JSON.stringify(v)); } catch (e) { /* ignore */ } },
   };
-  const SETTINGS_VERSION = 2;
+  const SETTINGS_VERSION = 3;
   const saved = store.get('settings', {});
   if (!(saved.v >= 2)) {
     // v2: the source is shown by default, and jazz solos joined the corpus
     delete saved.hideSource;
     if (Array.isArray(saved.genres) && !saved.genres.includes('jazz')) saved.genres.push('jazz');
   }
+  if (!(saved.v >= 3)) {
+    // v3: new defaults: level 1, 2 and 4 bars, all repertoire
+    delete saved.levels; delete saved.bars; delete saved.genres;
+  }
   const S = Object.assign({
-    tempo: 80, levels: [1, 2], bars: 2, meters: ['2/4', '3/4', '4/4', '6/8'],
+    tempo: 80, levels: [1], bars: [2, 4], meters: ['2/4', '3/4', '4/4', '6/8'],
     genres: Object.keys(GENRES), metro: true, hideSource: false, latency: 0, tapSound: true, silentMode: true, lowLatency: true,
   }, saved, { v: SETTINGS_VERSION });
   // separate saved timing offsets per output: Bluetooth headphones add 150-250 ms
@@ -67,6 +71,7 @@
   Object.keys(GENRES).forEach((g) => {
     if (!S.knownGenres.includes(g)) { S.knownGenres.push(g); if (Array.isArray(S.genres) && !S.genres.includes(g)) S.genres.push(g); }
   });
+  if (!Array.isArray(S.bars)) S.bars = [Number(S.bars) || 2];
   S.genres = S.genres.filter((g) => GENRES[g]);
   if (!S.genres.length) S.genres = Object.keys(GENRES);
   if (!ACCURACY[S.accuracy]) S.accuracy = 'normal';
@@ -82,7 +87,7 @@
   function pool() {
     // Latin patterns have a fixed, natural length (1 or 2 bars) and show whatever Length is set to
     return DATA.rhythms.filter((r) => S.levels.includes(r.l) && S.meters.includes(r.m)
-      && (r.f ? S.genres.includes('latin') : r.b === S.bars && r.o.some((o) => S.genres.includes(genreOf(o)))));
+      && (r.f ? S.genres.includes('latin') : S.bars.includes(r.b) && r.o.some((o) => S.genres.includes(genreOf(o)))));
   }
 
   // ---------- meter helpers ----------
@@ -204,7 +209,7 @@
   // Break measures into rows (only at barlines) so no measure is squeezed below its minimum.
   function planRows(item, avail) {
     const ms = measures(item);
-    const min = ms.map((m, i) => measureMinWidth(m) + (i === 0 ? 36 : 0) + (i === ms.length - 1 ? 16 : 0));
+    const min = ms.map((m, i) => measureMinWidth(m) + (i === 0 ? 66 : 0) + (i === ms.length - 1 ? 16 : 0));
     const options = [item.b, 2, 1].filter((p, i, a) => p <= item.b && item.b % p === 0 && a.indexOf(p) === i);
     for (const per of options) {
       const rows = [];
@@ -236,11 +241,20 @@
     stave.setBegBarType(VF.Barline.type.NONE).setEndBarType(VF.Barline.type.NONE);
     stave.setContext(ctx).draw();
     // leave room after a barline so the first note (and any tie into it) doesn't crowd it
-    if (mIdx > 0) stave.setNoteStartX(stave.getNoteStartX() + (k > 0 ? 14 : 6));
+    // (a row's first bar also leaves room for the "Pass 1" labels of the feedback lanes)
+    if (mIdx > 0) stave.setNoteStartX(stave.getNoteStartX() + (k > 0 ? 14 : 26));
     // one-line staves have zero-height barlines, so draw our own
     const ly = stave.getYForLine(0);
     const last = mIdx === item.b - 1;
     ctx.save(); ctx.setLineWidth(1.2);
+    if (mIdx === 0) {
+      // start-repeat sign after the time signature: thick line, thin line, dots
+      const nx = stave.getNoteStartX();
+      ctx.fillRect(nx + 7, ly - 15, 4, 30);
+      ctx.beginPath(); ctx.moveTo(nx + 14.5, ly - 15); ctx.lineTo(nx + 14.5, ly + 15); ctx.stroke();
+      [-6, 6].forEach((dy) => { ctx.beginPath(); ctx.arc(nx + 19.5, ly + dy, 2, 0, Math.PI * 2); ctx.fill(); });
+      stave.setNoteStartX(nx + 30);
+    }
     if (last) {
       // end-repeat sign: dots, thin line, thick line
       ctx.beginPath(); ctx.moveTo(x + w - 8, ly - 15); ctx.lineTo(x + w - 8, ly + 15); ctx.stroke();
@@ -267,6 +281,22 @@
       ev.vf = n;
       return n;
     });
+    const voice = new VF.Voice({ num_beats: mi.num, beat_value: mi.den }).setMode(VF.Voice.Mode.SOFT);
+    voice.addTickables(notes);
+    // beam each beat's eighths and shorter on our own tick grid (VexFlow's auto-beamer loses the beat
+    // after a triplet quarter and beams across beats); rests and longer notes break a beam
+    const beams = [];
+    let grp = [], pos = 0, grpBeat = -1;
+    const flush = () => { if (grp.length > 1) beams.push(new VF.Beam(grp)); grp = []; };
+    meas.forEach((e, i) => {
+      const b = Math.floor(pos / mi.beat);
+      const beamable = !(e[2] & FLAG.REST) && /^(8|16|32)/.test(e[1]) && Math.floor((pos + e[0] - 1) / mi.beat) === b;
+      if (!beamable || b !== grpBeat) flush();
+      if (beamable) { grp.push(notes[i]); grpBeat = b; }
+      pos += e[0];
+    });
+    flush();
+    // tuplets after beams, so a beamed triplet gets a plain 3 and an unbeamed one a bracket
     const tuplets = [];
     let tStart = -1;
     meas.forEach((e, i) => {
@@ -276,9 +306,6 @@
         tStart = -1;
       }
     });
-    const voice = new VF.Voice({ num_beats: mi.num, beat_value: mi.den }).setMode(VF.Voice.Mode.SOFT);
-    voice.addTickables(notes);
-    const beams = VF.Beam.generateBeams(notes, { groups: VF.Beam.getDefaultBeamGroups(item.m), stem_direction: 1, beam_rests: false });
     new VF.Formatter().joinVoices([voice]).formatToStave([voice], stave);
     voice.draw(ctx, stave);
     beams.forEach((b) => b.setContext(ctx).draw());
@@ -402,6 +429,17 @@
       l.setAttribute('stroke', TICK_COLOR); l.setAttribute('stroke-width', '2'); l.setAttribute('stroke-linecap', 'round');
       g.appendChild(l);
     });
+    // label each lane at the left edge of every row
+    layout.rows.forEach((row) => {
+      for (let pass = 0; pass < reps(); pass++) {
+        const t = document.createElementNS(NS, 'text');
+        t.setAttribute('x', 3); t.setAttribute('y', laneY(row, pass) + 3.5);
+        t.setAttribute('font-size', '9.5'); t.setAttribute('font-family', 'system-ui, -apple-system, sans-serif');
+        t.setAttribute('fill', '#6B736E'); t.setAttribute('class', 'pass-label');
+        t.textContent = `Pass ${pass + 1}`;
+        g.appendChild(t);
+      }
+    });
     lastResult.tapTicks.forEach((tk) => {
       const p = tickToXY(Math.max(0, Math.min(total, tk.tick - tk.pass * total)));
       if (!p) return;
@@ -424,7 +462,7 @@
   function audio() {
     if (!ac) {
       ac = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
-      ac.onstatechange = updateSoundStatus;
+      ac.onstatechange = () => { updateSoundStatus(); if (ac.state === 'running') setTimeout(detectOutput, 400); };
     }
     // 'suspended' before the first tap; 'interrupted' on iOS after a call, Siri or backgrounding
     if (ac.state !== 'running' && ac.state !== 'closed') ac.resume().catch(() => {});
@@ -527,6 +565,33 @@
     if (!keepAlive) return;
     try { keepAlive.stop(); keepAlive.disconnect(); } catch (e) { /* already stopped */ }
     keepAlive = null;
+  }
+
+  // Pick Speaker or Bluetooth from the output delay the browser reports (Chrome and Android report it;
+  // Bluetooth adds 100-250 ms). Only a change in what's detected switches the setting, so a manual
+  // choice sticks until the output actually changes. Browsers that don't report it (Safari) keep the
+  // manual choice.
+  let detectedOutput = null;
+  function detectOutput() {
+    const el = $('outputAuto');
+    if (!ac || !(ac.outputLatency > 0)) {
+      if (el && ac && ac.state === 'running') el.textContent = "This browser doesn't report which output is playing, so choose it here.";
+      return;
+    }
+    const ms = Math.round((ac.outputLatency + (ac.baseLatency || 0)) * 1000);
+    const guess = ms >= 90 ? 'bluetooth' : 'speaker';
+    if (el) el.textContent = `Detected automatically from the ${ms} ms output delay your browser reports.`;
+    if (guess === detectedOutput) return;
+    detectedOutput = guess;
+    if (S.output !== guess && phase === 'idle') setOutput(guess);
+  }
+  function setOutput(val) {
+    S.output = val;
+    S.tapSound = !!S.tapSoundBy[S.output]; // each output keeps its own tap-click setting
+    save(); syncSettings(); if (lastResult) renderOutcome();
+  }
+  if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+    navigator.mediaDevices.addEventListener('devicechange', () => setTimeout(detectOutput, 600));
   }
 
   function updateSoundStatus() {
@@ -714,6 +779,7 @@
     }
     if (token !== loadingToken || run) return;
     const c = audio();
+    if (mode !== 'calib') detectOutput();
     const spt = secPerTick();
     const mi = current.mi;
     const beatSec = mi.beat * spt;
@@ -1101,7 +1167,26 @@
   const MORE_METERS = METER_ORDER.filter((m) => !PRIMARY_METERS.includes(m));
   const GENRE_SHORT = { folk: 'Folk', chorale: 'Bach', classical: 'Classical', ragtime: 'Ragtime', jazz: 'Jazz', popular: 'Songs', latin: 'Latin' };
 
-  function toggleGroup(el, entries, key, multi, repick = true) {
+  function toggleGroup(el, entries, key, multi, repick = true, withAll = false) {
+    const changed = () => {
+      save();
+      syncSettings();
+      if (!repick) return; // e.g. switching headphones keeps the current rhythm
+      if (run) stopRun(true);
+      pickNext();
+      setButtons();
+    };
+    const all = entries.map((e) => e.val);
+    if (withAll) {
+      // "All" turns every option on; with everything on, clicking one option picks just that one
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = 'All';
+      b.dataset.all = key;
+      b.dataset.vals = JSON.stringify(all);
+      b.addEventListener('click', () => { S[key] = all.slice(); changed(); });
+      el.appendChild(b);
+    }
     entries.forEach(({ val, label, aria }) => {
       const b = document.createElement('button');
       b.type = 'button';
@@ -1112,15 +1197,11 @@
       b.addEventListener('click', () => {
         if (multi) {
           const has = S[key].includes(val);
-          if (has && S[key].length === 1) return; // keep at least one selected
-          S[key] = has ? S[key].filter((v) => v !== val) : S[key].concat([val]);
+          if (withAll && all.every((v) => S[key].includes(v))) S[key] = [val];
+          else if (has && S[key].length === 1) return; // keep at least one selected
+          else S[key] = has ? S[key].filter((v) => v !== val) : S[key].concat([val]);
         } else S[key] = val;
-        save();
-        syncSettings();
-        if (!repick) return; // e.g. switching headphones keeps the current rhythm
-        if (run) stopRun(true);
-        pickNext();
-        setButtons();
+        changed();
       });
       el.appendChild(b);
     });
@@ -1131,6 +1212,10 @@
       const v = JSON.parse(b.dataset.val);
       const cur = S[b.dataset.key];
       b.setAttribute('aria-pressed', Array.isArray(cur) ? cur.includes(v) : cur === v);
+    });
+    document.querySelectorAll('#settings [data-all]').forEach((b) => {
+      const cur = S[b.dataset.all];
+      b.setAttribute('aria-pressed', JSON.parse(b.dataset.vals).every((v) => cur.includes(v)));
     });
     const hiddenOn = MORE_METERS.filter((m) => S.meters.includes(m)).length;
     const more = $('btnMoreMeters');
@@ -1153,7 +1238,7 @@
     const levels = S.levels.slice().sort().join(', ');
     const genres = Object.keys(GENRES).filter((g) => S.genres.includes(g)).map((g) => GENRE_SHORT[g]).join(', ');
     const meters = METER_ORDER.filter((m) => S.meters.includes(m)).join(', ');
-    $('pool').innerHTML = `${n.toLocaleString()} of ${DATA.rhythms.length.toLocaleString()} real rhythms match: level ${levels}; ${meters}; ${genres}; ${S.bars} bars.<span class="browse">Browse every rhythm in the corpus</span>`;
+    $('pool').innerHTML = `${n.toLocaleString()} of ${DATA.rhythms.length.toLocaleString()} real rhythms match: level ${levels}; ${meters}; ${genres}; ${S.bars.slice().sort().join(' or ')} bars.<span class="browse">Browse every rhythm in the corpus</span>`;
     const note = $('poolNote');
     note.textContent = `${n.toLocaleString()} matching`;
     note.title = `Level ${levels} · ${meters} · ${genres}`;
@@ -1161,9 +1246,9 @@
   }
 
   function buildSettings() {
-    toggleGroup($('levels'), Object.keys(LEVELS).map((k) => ({ val: Number(k), label: k, aria: `Level ${k}, ${LEVELS[k][0]}` })), 'levels', true);
+    toggleGroup($('levels'), Object.keys(LEVELS).map((k) => ({ val: Number(k), label: k, aria: `Level ${k}, ${LEVELS[k][0]}` })), 'levels', true, true, true);
     $('levelHelp').innerHTML = Object.entries(LEVELS).map(([k, v]) => `<dt>${k} ${esc(v[0])}</dt><dd>${esc(v[1])}</dd>`).join('');
-    toggleGroup($('lengths'), [{ val: 2, label: '2 bars' }, { val: 4, label: '4 bars' }], 'bars', false);
+    toggleGroup($('lengths'), [{ val: 2, label: '2 bars' }, { val: 4, label: '4 bars' }], 'bars', true);
     toggleGroup($('accuracy'), Object.entries(ACCURACY).map(([k, v]) => ({ val: k, label: v.label })), 'accuracy', false, false);
     $('accuracy').addEventListener('click', () => {
       // re-score the last attempt so the modes can be compared on the same playing
@@ -1185,7 +1270,7 @@
       $('meters').appendChild(more);
       if (MORE_METERS.some((m) => S.meters.includes(m))) { /* stays collapsed; the badge says how many are on */ }
     }
-    toggleGroup($('genres'), Object.keys(GENRES).map((g) => ({ val: g, label: GENRE_SHORT[g], aria: GENRES[g] })), 'genres', true);
+    toggleGroup($('genres'), Object.keys(GENRES).map((g) => ({ val: g, label: GENRE_SHORT[g], aria: GENRES[g] })), 'genres', true, true, true);
     $('metro').addEventListener('click', () => { S.metro = !S.metro; save(); syncSettings(); });
     $('tapSoundSw').addEventListener('click', () => {
       S.tapSound = !S.tapSound; S.tapSoundBy[S.output] = S.tapSound;
@@ -1206,10 +1291,7 @@
     $('latency').addEventListener('change', (e) => { S.offsets[S.output] = Math.max(-300, Math.min(500, Number(e.target.value) || 0)); save(); syncSettings(); });
     toggleGroup($('outputs'), [{ val: 'speaker', label: 'Speaker / wired' }, { val: 'bluetooth', label: 'Bluetooth' }], 'output', false, false);
     // runs after the button's own handler has set S.output: bring that output's tap-click setting with it
-    $('outputs').addEventListener('click', () => {
-      S.tapSound = !!S.tapSoundBy[S.output];
-      save(); syncSettings(); if (lastResult) renderOutcome();
-    });
+    $('outputs').addEventListener('click', () => setOutput(S.output));
     $('btnCalib').addEventListener('click', calibrate);
     $('btnTestSound').addEventListener('click', async () => {
       const ok = await ensureRunning();
@@ -1312,7 +1394,7 @@
       const flat = flatten(item);
       const ms = measures(item);
       const s = 0.72; const Wl = W / s;
-      const min = ms.map((m, i) => measureMinWidth(m) + (i === 0 ? 36 : 0) + (i === ms.length - 1 ? 16 : 0));
+      const min = ms.map((m, i) => measureMinWidth(m) + (i === 0 ? 66 : 0) + (i === ms.length - 1 ? 16 : 0));
       const sum = min.reduce((acc, v) => acc + v, 0);
       const squeeze = Math.min(1, (Wl - 8) / sum);
       const spare = Math.max(0, Wl - 8 - sum * squeeze);
@@ -1526,6 +1608,7 @@
   window.actualRhythms = {
     get current() { return current; }, get run() { return run; }, get result() { return lastResult; },
     get phase() { return phase; }, get layout() { return layout; }, audio, piano, pianoPitches,
+    show: (i, o = 0) => show(DATA.rhythms[i], DATA.rhythms[i].o[o]),
   };
 
   setupUI();

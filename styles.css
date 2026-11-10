@@ -413,8 +413,12 @@ html[data-layout="wide"] .pills button.more .icon { width: 14px; height: 14px; }
 html[data-layout="wide"] .pills button.more .icon { display: none; }
 
 /* touch devices (iPhone, iPad): bigger settings icon */
-html[data-touch] .settings-btn .icon { width: 28px; height: 28px; }
-html[data-touch][data-layout="phone"] .settings-btn, html[data-touch][data-layout="phone-landscape"] .settings-btn { width: 48px; height: 48px; }
+html[data-touch] .settings-btn { height: 52px; margin: -4px 0; font-size: 17px; gap: 8px; }
+html[data-touch] .settings-btn .icon { width: 36px; height: 36px; }
+html[data-touch][data-layout="phone"] .settings-btn { width: 56px; height: 56px; margin: -4px -8px -4px 0; }
+html[data-touch][data-layout="phone"] .settings-btn .icon { width: 40px; height: 40px; }
+html[data-touch][data-layout="phone-landscape"] .settings-btn { width: 48px; height: 44px; margin-right: -6px; }
+html[data-touch][data-layout="phone-landscape"] .settings-btn .icon { width: 34px; height: 34px; }
 
 /* ---------- touch devices: the page is pinned to the screen; only inner panels scroll ---------- */
 html[data-touch], html[data-touch] body { height: 100%; overflow: hidden; overscroll-behavior: none; }

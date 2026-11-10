@@ -471,6 +471,23 @@ def main():
             found.extend(windows_from_bars(clean, src))
         print(f'jazz: {len(found) - n0} windows from the Weimar Jazz Database', file=sys.stderr)
 
+    # a triplet group must start on its own grid (a beat for triplet eighths, half a beat for triplet
+    # sixteenths, half a bar for triplet quarters); one that starts off the beat and runs into the next
+    # beat can't be written cleanly, so drop the window (checked here so cached windows are covered)
+    def triplets_aligned(w):
+        for meas in w['measures']:
+            pos = start = 0
+            for e in meas:
+                if e[2] & FLAG_TSTART:
+                    start = pos
+                pos += e[0]
+                if e[2] & FLAG_TSTOP and start % (pos - start):
+                    return False
+        return True
+    n0 = len(found)
+    found = [w for w in found if triplets_aligned(w)]
+    print(f'dropped {n0 - len(found)} windows with off-beat triplet groups', file=sys.stderr)
+
     # final tidy-up of names (cheap, so it runs on cached windows too)
     COMPOSERS = {'beethoven': 'Ludwig van Beethoven', 'mozart': 'Wolfgang Amadeus Mozart', 'haydn': 'Joseph Haydn',
                  'schubert': 'Franz Schubert', 'chopin': 'Frédéric Chopin', 'joplin': 'Scott Joplin',

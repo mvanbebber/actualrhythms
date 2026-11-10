@@ -46,7 +46,7 @@ async function newPage(browser, base, w, h, touch, settings) {
   p.errors = [];
   p.on('pageerror', (e) => p.errors.push(e.message));
   p.on('console', (m) => { if (m.type() === 'error') p.errors.push(m.text()); });
-  await p.addInitScript((s) => localStorage.setItem('rr.settings', JSON.stringify(s)), Object.assign({ v: 2 }, settings || {}));
+  await p.addInitScript((s) => localStorage.setItem('rr.settings', JSON.stringify(s)), Object.assign({ v: 3 }, settings || {}));
   await p.goto(base);
   await p.waitForSelector('#score svg');
   await p.evaluate(() => document.fonts && document.fonts.ready);
@@ -180,7 +180,7 @@ async function performTaps(p, { lateMs = 0, skipFirst = 0 } = {}) {
     check(res.pct >= 90 && res.cnt.miss === 0 && res.extra === 0, 'perfect-ish taps should score >= 90% with no misses or extras');
     check(res.onsets === n, `expected ${n} onsets across two passes, got ${res.onsets}`);
     const after = { sheet: await box(p, '.sheet'), pad: await box(p, '#pad') };
-    check(Math.abs(after.pad.y - before.pad.y) < 1 && Math.abs(after.sheet.h - before.sheet.h) < 1, 'score or pad moved when results appeared');
+    check(Math.abs(after.pad.y - before.pad.y) < 1 && Math.abs(after.sheet.h - before.sheet.h) < 1, `score or pad moved when results appeared ${JSON.stringify({ before, after })}`);
     check(await p.isVisible('.result .bigscore'), 'result not shown');
     const ex = await id();
     await p.setViewportSize({ width: 844, height: 390 });
@@ -217,8 +217,8 @@ async function performTaps(p, { lateMs = 0, skipFirst = 0 } = {}) {
     for (let i = 0; i < 40; i++) { await p.keyboard.press('Tab'); inside = inside && await p.evaluate(() => !!document.activeElement.closest('#settings')); }
     check(inside, 'focus escaped the settings dialog');
     // multiselect survives: turn on level 3 too
-    const before = await p.evaluate(() => JSON.parse(localStorage.getItem('rr.settings')).levels || [1, 2]);
-    await p.click('#levels button:nth-child(3)');
+    const before = await p.evaluate(() => JSON.parse(localStorage.getItem('rr.settings')).levels || [1]);
+    await p.click('#levels button[data-val="3"]');
     const levels = await p.evaluate(() => JSON.parse(localStorage.getItem('rr.settings')).levels);
     check(levels.length === before.length + 1, `difficulty should stay multi-select (${JSON.stringify(levels)})`);
     await p.click('#btnMoreMeters');

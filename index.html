@@ -23,7 +23,7 @@
   // touch devices (phones, iPads, including iPads with a keyboard or trackpad) get the locked, no-scroll page
   if (navigator.maxTouchPoints > 0 || 'ontouchstart' in window) document.documentElement.dataset.touch = '';
 </script>
-<link rel="stylesheet" href="styles.css?v=29">
+<link rel="stylesheet" href="styles.css?v=30">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
@@ -135,6 +135,7 @@
         <fieldset>
           <legend>Listening on</legend>
           <div class="seg" id="outputs"></div>
+          <p class="help" id="outputAuto" aria-live="polite"></p>
           <p class="help">Each has its own timing offset and tap-click setting. Bluetooth headphones add about 150–250 ms, so the click of your own tap is switched off for Bluetooth (it would always arrive late). Calibrate once with each in Advanced settings.</p>
         </fieldset>
         <details class="disclosure" id="advanced">
@@ -221,7 +222,7 @@
 </div>
 
 <script src="vendor/vexflow.js"></script>
-<script src="data/rhythms.js?v=212f6c041c"></script>
-<script src="app.js?v=27"></script>
+<script src="data/rhythms.js?v=200f342d0b"></script>
+<script src="app.js?v=28"></script>
 </body>
 </html>

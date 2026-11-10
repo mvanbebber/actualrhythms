@@ -568,6 +568,12 @@ def main():
             if w.get('fixed'):
                 uniq[key]['f'] = 1  # natural length: shown whatever Length is set to
         u = uniq[key]
+        # the same bar of the same part counted again (a score that reuses bar numbers, e.g. in
+        # repeat endings or a repeated section) is one occurrence, not several
+        where = (occ[0], occ[1], occ[2])
+        if where in u.setdefault('seen', set()):
+            continue
+        u['seen'].add(where)
         u['n'] += 1
         u.setdefault('all', []).append(occ)  # every occurrence, for the lazily loaded data/occurrences.js
         if len(u['o']) < args.max_sources and all(o[0] != occ[0] for o in u['o']):
@@ -635,8 +641,13 @@ def main():
     for u in items:
         kept = Counter((o[0], o[1], o[2]) for o in u['o'])  # each kept occurrence is skipped once
         rows = []
+        done = set()
+        u.pop('seen', None)
         for o in u.pop('all', []):
             k = (o[0], o[1], o[2])
+            if k in done:
+                continue
+            done.add(k)
             if kept[k]:
                 kept[k] -= 1
                 continue

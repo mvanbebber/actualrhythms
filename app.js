@@ -976,28 +976,29 @@
     const surname = (composer || '').trim().split(/\s+/).pop();
     const redundant = HIDE_COLLECTION.has(folder) || (surname && coll.includes(surname));
     const from = redundant ? '' : `, from ${esc(coll)}`;
-    const others = item.o.filter((o) => o !== occ).slice(0, 4).map((o) => {
+    const others = item.o.filter((o) => o[0] !== occ[0]).slice(0, 4).map((o) => {
       const src = DATA.sources[o[0]];
       const place = src[3] || (HIDE_COLLECTION.has(src[2]) ? '' : DATA.collections[src[2]].label);
       return `<li>${esc(src[0])}${src[1] ? ' (' + esc(src[1]) + ')' : ''}${place ? ', ' + esc(place) : ''}${src[4] ? ', ' + esc(src[4].replace(/^(composed|published|recorded|harmonized) /, '')) : ''}</li>`;
     }).join('');
-    const extra = item.n - item.o.length;
     const alt = otherSpellings(item);
     const altMeters = [...new Set(alt.others.map((r) => r.m))].join(', ');
     const seeAll = (text) => `<button type="button" class="link-btn inline" data-action="family">${text}</button>`;
-    const more = extra > 0 ? `<p>${seeAll(`Plus ${extra} more occurrence${extra > 1 ? 's' : ''} across the corpus`)}</p>` : '';
-    const altLine = alt.n ? `<p>${seeAll(`Also written another way ${alt.n} time${alt.n > 1 ? 's' : ''} (${esc(altMeters)}), with the same proportions`)}</p>` : '';
     const q = occ[4];
     const tempoLine = q ? `<p>Tempo: ${originalTempo()} BPM${current.mi.compound ? ` (dotted-${current.mi.den === 8 ? 'quarter' : 'half'} beat)` : ''}, ${
       folder === 'wjd' ? 'the average tempo of the recording' : 'from the metronome mark in the score'}.</p>` : '';
-    const occurs = item.n > 1 ? `This rhythm occurs ${item.n} times in the corpus.` : 'This rhythm is unique to one piece in the corpus.';
+    // one link to the full list: this spelling's count, plus the same proportions written other ways
+    const altText = alt.n ? `, and ${alt.n} more time${alt.n > 1 ? 's' : ''} written another way (${esc(altMeters)}) with the same proportions` : '';
+    const occurs = item.n > 1 || alt.n
+      ? seeAll(`This rhythm occurs ${item.n === 1 ? 'once' : `${item.n} times`} in the corpus${altText}. See them all`)
+      : 'This rhythm is unique to one piece in the corpus.';
     return `<div class="source">
       <div class="eyebrow">Where this rhythm comes from</div>
       <h3>${esc(title)}${composer ? ` <em>${esc(composer)}</em>` : ''}</h3>
       ${where ? `<p class="where">${where}</p>` : ''}
       <p>${[part.replace(/, $/, ''), bars].filter(Boolean).join(', ')}${from}${note ? ` · ${esc(note)}` : ''}</p>
-      ${tempoLine}<p>${item.n > 1 || alt.n ? seeAll(occurs) : occurs}</p>
-      ${others ? `<div class="eyebrow">Also found in</div><ul>${others}</ul>` : ''}${more}${altLine}
+      ${tempoLine}<p>${occurs}</p>
+      ${others ? `<div class="eyebrow">Also found in</div><ul>${others}</ul>` : ''}
       <button type="button" class="link-btn" data-action="corpus">Browse every rhythm in the corpus</button>
     </div>`;
   }

@@ -748,6 +748,42 @@ def main():
         if s['folder'] in COMPOSERS:
             s['composer'] = COMPOSERS[s['folder']]
 
+    # Compound meters: a beat of rest is one dotted rest (a dotted quarter in 6/8, 9/8 and 12/8, a dotted
+    # half in 6/4), not a quarter rest and an eighth rest
+    def merge_beat_rests(meter_str, measures):
+        num, den = map(int, meter_str.split('/'))
+        if not (num % 3 == 0 and num > 3):
+            return 0
+        beat = TPQ * 4 // den * 3
+        code = {36: 'qd', 72: 'hd'}.get(beat)
+        if not code:
+            return 0
+        changed = 0
+        for m in measures:
+            if len(m) == 1:
+                continue  # a whole-bar rest stays as it is
+            out, pos, i = [], 0, 0
+            while i < len(m):
+                e = m[i]
+                if pos % beat == 0 and e[2] & FLAG_REST and not e[2] & FLAG_TRIP:
+                    j, acc = i, 0
+                    while j < len(m) and m[j][2] & FLAG_REST and not m[j][2] & FLAG_TRIP and acc < beat:
+                        acc += m[j][0]
+                        j += 1
+                    if acc == beat and j - i > 1:
+                        out.append([beat, code, FLAG_REST] + ([0] if len(e) > 3 else []))
+                        pos += beat
+                        i = j
+                        changed += 1
+                        continue
+                out.append(e)
+                pos += e[0]
+                i += 1
+            m[:] = out
+        return changed
+    n_merged = sum(merge_beat_rests(w['meter'], w['measures']) for w in found if not w.get('fixed'))
+    print(f'compound meters: {n_merged} beats of rest written as one dotted rest', file=sys.stderr)
+
     # dedupe by rhythm (pitches ignored)
     uniq = {}
     sources = []

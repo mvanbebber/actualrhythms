@@ -43,7 +43,7 @@ OVERRIDES = {
     'Show-Type Tune (Bill Evans Solo)': {'performer': 'Bill Evans', 'tune_by': 'Lee Konitz'},
     "Well You Needn't": {'performer': 'John Coltrane', 'tune_by': 'Thelonious Monk', 'subtitle': 'John Coltrane solo on "Walkin\'"'},
     'Green Dolphin Sendoff': {'performer': 'Michael Van Bebber', 'tune_by': 'Bronisław Kaper'},
-    'Dream Police': {'performer': 'The Isley Brothers'},
+    'Dream Police': {'performer': 'Cheap Trick', 'tune_by': 'Rick Nielsen'},
     "Who's That Lady": {'performer': 'The Isley Brothers'},
     'Battle Cry Solo': {'performer': 'Ryan Kisor'},
     'A Kiss To Build A Dream On': {'title': 'A Kiss to Build a Dream On'},
@@ -61,10 +61,28 @@ OVERRIDES = {
     "Gertrude's Bounce - Quintet Arrangment": {'performer': 'Clifford Brown and Max Roach'},
     'Where You At?': {'title': 'Where You At?'},
     'sandu - Freddie Hubbard': {'title': 'Sandu'},
-    'Lazy Bird - Solos': {'title': 'Lazy Bird'},
+    'Lazy Bird - Solos': {'title': 'Lazy Bird', 'tune_by': 'John Coltrane'},
     'Chessmates': {'performer': 'Joe Lovano', 'tune_by': 'Joe Lovano'},
     "I've Found a New Baby - Sidney Bechet": {'performer': 'Sidney Bechet'},
+    # corrections checked against the recordings
+    "Gertrude's Bounce - Clifford Brown Solo": {'performer': 'Clifford Brown', 'tune_by': 'Richie Powell'},
+    "Gertrude's Bounce - Quintet Arrangment": {'performer': 'Clifford Brown and Max Roach', 'tune_by': 'Richie Powell'},
+    'Two Bass Hit - Coltrane': {'tune_by': 'Dizzy Gillespie and John Lewis'},
+    'You and the Night and the Music - Freddie Hubbard': {'tune_by': 'Arthur Schwartz and Howard Dietz'},
+    'A Kiss To Build A Dream On': {'title': 'A Kiss to Build a Dream On', 'performer': '',
+                                   'tune_by': 'Bert Kalmar, Harry Ruby and Oscar Hammerstein II'},
+    'Little Boy Blue': {'performer': '', 'tune_by': 'Richard Rodgers and Lorenz Hart'},
+    'Mercy Mercy Mercy': {'performer': 'Cannonball Adderley', 'tune_by': 'Joe Zawinul'},
+    'Belly Roll - Quincy Jones': {'performer': 'Count Basie Orchestra', 'tune_by': 'Quincy Jones'},
+    'Little Church - Hermeto Pascoal - Miles Davis Version': {'performer': 'Miles Davis', 'tune_by': 'Hermeto Pascoal'},
+    "Moanin' - Quincy Version": {'performer': 'Quincy Jones', 'tune_by': 'Bobby Timmons'},
+    'My Ship - Gil Evans (Vocal)': {'tune_by': 'Kurt Weill'},
+    "Sippin' at Bell's": {'tune_by': 'Miles Davis'},
+    'Oleo - John Coltrane Solo': {'subtitle': 'John Coltrane Solo on "Relaxin\'" (1956)', 'tune_by': 'Sonny Rollins'},
 }
+# typos in title blocks
+SUBTITLE_FIXES = [('Quesiton', 'Question'), ('"Inner Visions"', '"Innervisions"'), ('Burell', 'Burrell'),
+                  ('(Okey ', '(Okeh '), ('"Tapestry" - 1979', '"Tapestry" - 1971'), ('"Live Evil"', '"Live-Evil"')]
 INSTRUMENT_WORDS = r'\s+(?:tenor|alto|baritone|soprano|trumpet|piano|guitar|bass|drums|sax|saxophone)$'
 
 
@@ -108,12 +126,15 @@ def credits(path, title_text, composer_text):
     if not performer:
         performer = tune_by
     year = None
+    texts = [l.replace('"Tapestry" - 1979', '"Tapestry" - 1971').replace('"Relaxin\'" (1957)', '"Relaxin\'" (1956)') for l in texts]
     for line in texts:
         m = re.search(r'\b(19[2-9]\d|20[0-2]\d)\b', line)
         if m:
             year = int(m.group(1))
             break
     subtitle = '; '.join(l for l in subtitle_lines if not TRANSCRIBER_RE.search(l))
+    for a, b in SUBTITLE_FIXES:
+        subtitle = subtitle.replace(a, b)
     o = OVERRIDES.get(stem, {})
     title = o.get('title', title)
     performer = o.get('performer', performer) or ''

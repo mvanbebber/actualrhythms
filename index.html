@@ -23,7 +23,7 @@
   // touch devices (phones, iPads, including iPads with a keyboard or trackpad) get the locked, no-scroll page
   if (navigator.maxTouchPoints > 0 || 'ontouchstart' in window) document.documentElement.dataset.touch = '';
 </script>
-<link rel="stylesheet" href="styles.css?v=32">
+<link rel="stylesheet" href="styles.css?v=33">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
@@ -99,7 +99,7 @@
     <aside class="settings" id="settings" aria-labelledby="settingsTitle">
       <div class="sheet-handle" aria-hidden="true"></div>
       <div class="settings-head">
-        <h2 id="settingsTitle">Practice settings</h2>
+        <h2 id="settingsTitle">Settings</h2>
         <button class="btn btn-icon btn-quiet" id="btnCloseSettings" type="button" aria-label="Close settings"><svg class="icon" aria-hidden="true"><use href="#i-close"/></svg></button>
       </div>
       <div class="settings-body">
@@ -107,7 +107,7 @@
           <legend>Difficulty</legend>
           <div class="seg" id="levels"></div>
           <details class="disclosure">
-            <summary>What the levels mean<svg class="icon chev" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
+            <summary>Levels<svg class="icon chev" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
             <dl class="level-help" id="levelHelp"></dl>
           </details>
         </fieldset>
@@ -137,57 +137,51 @@
           <legend>Listening on</legend>
           <div class="seg" id="outputs"></div>
           <p class="help" id="outputAuto" aria-live="polite"></p>
-          <p class="help">Each has its own timing offset and tap-click setting. Bluetooth headphones add about 150–250 ms, so the click of your own tap is switched off for Bluetooth (it would always arrive late). Calibrate once with each in Advanced settings.</p>
+          <div class="calib">
+            <div class="calib-row">
+              <label for="latency">Offset</label>
+              <input id="latency" type="number" step="5" min="-300" max="500" inputmode="numeric"> <span class="help">ms</span>
+              <button class="btn" id="btnCalib" type="button">Calibrate</button>
+            </div>
+            <span id="latencyFor" hidden></span>
+            <button class="calib-pad" id="calibPad" type="button" hidden>Tap with the clicks</button>
+            <p class="calib-msg" id="calibMsg" aria-live="polite"></p>
+            <p class="calib-warn" id="calibWarn"></p>
+          </div>
         </fieldset>
         <details class="disclosure" id="advanced">
-          <summary>Advanced settings<svg class="icon chev" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
+          <summary>More<svg class="icon chev" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
           <div class="advanced-body">
             <div class="switch-row">
-              <span id="hideLabel">Hide the source until I've played it</span>
+              <span id="hideLabel">Hide source until played</span>
               <button class="switch" id="hideSource" type="button" role="switch" aria-labelledby="hideLabel"></button>
             </div>
             <div class="switch-row">
-              <span id="tapSoundLabel">Click when I tap</span>
+              <span id="tapSoundLabel">Tap click</span>
               <button class="switch" id="tapSoundSw" type="button" role="switch" aria-labelledby="tapSoundLabel"></button>
             </div>
             <div class="switch-row">
-              <span id="lowLatencyLabel">Low-latency mode</span>
+              <span id="lowLatencyLabel">Low-latency audio</span>
               <button class="switch" id="lowLatencySw" type="button" role="switch" aria-labelledby="lowLatencyLabel" aria-describedby="lowLatencyHelp"></button>
             </div>
-            <p class="help" id="lowLatencyHelp">Keeps the audio engine awake with an inaudible signal so tap clicks aren't delayed. Uses a little more battery.</p>
+            <p class="help" id="lowLatencyHelp">Faster clicks; uses a little battery.</p>
             <div class="switch-row" id="silentRow">
-              <span id="silentLabel">Play sound in Silent mode (iPhone, iPad)</span>
+              <span id="silentLabel">Play in Silent mode</span>
               <button class="switch" id="silentSw" type="button" role="switch" aria-labelledby="silentLabel" aria-describedby="silentHelp"></button>
             </div>
-            <p class="help" id="silentHelp">Uses a silent background clip so iOS treats the page as music. If your taps sound late, try switching this off and compare.</p>
+            <p class="help" id="silentHelp">If taps sound late, try it off.</p>
             <div class="help-block">
               <h3>Sound check</h3>
               <p class="help" id="soundStatus"></p>
               <button class="btn" id="btnTestSound" type="button">Play test sound</button>
             </div>
-            <div class="calib">
-              <h3>Timing calibration</h3>
-              <p class="help">Calibrate plays 16 clicks; tap along with the last 12, just as you would in practice, and the offset is measured for whatever you're listening on (see Listening on). Recalibrate if you switch tap clicks on or off.</p>
-              <div class="calib-row">
-                <label for="latency">Offset</label>
-                <input id="latency" type="number" step="5" min="-300" max="500" inputmode="numeric"> <span class="help">ms <span id="latencyFor"></span></span>
-                <button class="btn" id="btnCalib" type="button">Calibrate</button>
-              </div>
-              <button class="calib-pad" id="calibPad" type="button" hidden>Tap with the clicks</button>
-              <p class="calib-msg" id="calibMsg" aria-live="polite"></p>
-              <p class="calib-warn" id="calibWarn"></p>
-            </div>
-            <div class="help-block">
-              <h3>Tempo</h3>
-              <p class="help">Tempo counts the beat: quarter notes in simple time, dotted quarters in 6/8, 9/8 and 12/8 (and dotted halves in 6/4).</p>
+            <div class="help-block keys-help">
+              <h3>Keys</h3>
+              <p class="help"><kbd>Space</kbd> <kbd>F</kbd> <kbd>J</kbd> tap · <kbd>Enter</kbd> start/stop · <kbd>L</kbd> listen · <kbd>←</kbd> <kbd>→</kbd> previous/next · <kbd>Esc</kbd> stop</p>
             </div>
             <div class="help-block credits-help">
               <h3>Credits</h3>
-              <p class="help">Rhythms come from public-domain scores in the music21 corpus; Scott Joplin's rags in the digital edition by Craig Stuart Sapp (<a href="https://github.com/craigsapp/joplin" target="_blank" rel="noopener">github.com/craigsapp/joplin</a>, CC BY-NC-SA 4.0); public-domain lead sheets from OpenEWLD; and the Weimar Jazz Database's transcriptions of improvised solos (Jazzomat Research Project, MIT licence). Every excerpt is a real passage. The rhythm data is shared under CC BY-NC-SA 4.0 (non-commercial, share-alike). Piano: Salamander Grand Piano V3 by Alexander Holm (CC BY 3.0). Notation by VexFlow.</p>
-            </div>
-            <div class="help-block keys-help">
-              <h3>Keyboard</h3>
-              <p class="help"><kbd>Space</kbd>, <kbd>F</kbd> or <kbd>J</kbd> tap · <kbd>Enter</kbd> start or stop · <kbd>L</kbd> listen · <kbd>←</kbd> <kbd>→</kbd> previous and next rhythm · <kbd>Esc</kbd> stop</p>
+              <p class="help">Rhythms: music21 corpus; Joplin rags ed. Craig Stuart Sapp (<a href="https://github.com/craigsapp/joplin" target="_blank" rel="noopener">CC BY-NC-SA 4.0</a>); OpenEWLD; Weimar Jazz Database (MIT). Data: CC BY-NC-SA 4.0. Piano: Salamander Grand V3 (CC BY 3.0). Notation: VexFlow.</p>
             </div>
           </div>
         </details>
@@ -224,6 +218,6 @@
 
 <script src="vendor/vexflow.js"></script>
 <script src="data/rhythms.js?v=fcfac5ae62"></script>
-<script src="app.js?v=30"></script>
+<script src="app.js?v=31"></script>
 </body>
 </html>

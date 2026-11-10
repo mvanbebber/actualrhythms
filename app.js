@@ -65,7 +65,7 @@
   if (!S.tapSoundBy || typeof S.tapSoundBy !== 'object') S.tapSoundBy = { speaker: true, bluetooth: false };
   S.tapSound = !!S.tapSoundBy[S.output];
   const calibStale = () => latencyMs() !== 0 && S.calibClick[S.output] !== !!S.tapSound;
-  const OUTPUT_NAME = { speaker: 'speaker or wired headphones', bluetooth: 'Bluetooth headphones' };
+  const OUTPUT_NAME = { speaker: 'speaker', bluetooth: 'Bluetooth' };
   // repertoire groups added since the settings were saved start switched on
   if (!Array.isArray(S.knownGenres)) S.knownGenres = ['folk', 'chorale', 'classical', 'ragtime', 'jazz'];
   Object.keys(GENRES).forEach((g) => {
@@ -575,12 +575,12 @@
   function detectOutput() {
     const el = $('outputAuto');
     if (!ac || !(ac.outputLatency > 0)) {
-      if (el && ac && ac.state === 'running') el.textContent = "This browser doesn't report which output is playing, so choose it here.";
+      if (el) el.textContent = '';
       return;
     }
     const ms = Math.round((ac.outputLatency + (ac.baseLatency || 0)) * 1000);
     const guess = ms >= 90 ? 'bluetooth' : 'speaker';
-    if (el) el.textContent = `Detected automatically from the ${ms} ms output delay your browser reports.`;
+    if (el) el.textContent = `Auto-detected (${ms} ms delay)`;
     if (guess === detectedOutput) return;
     detectedOutput = guess;
     if (S.output !== guess && phase === 'idle') setOutput(guess);
@@ -1006,8 +1006,8 @@
     else if (Math.abs(R.mean) > 0.03) {
       verdict = `You were ${ms(Math.abs(R.mean))} ms ${R.mean < 0 ? 'early (rushing)' : 'late (dragging)'} on average. `
         + (calibStale()
-          ? `Your ${OUTPUT_NAME[S.output]} offset was measured with tap clicks ${S.tapSound ? 'off' : 'on'}, so it doesn't fit how you're playing now: recalibrate in Advanced settings.`
-          : 'If that is steady across attempts, recalibrate in Advanced settings.');
+          ? `Your ${OUTPUT_NAME[S.output]} offset was measured with tap click ${S.tapSound ? 'off' : 'on'}: recalibrate in Settings, under Listening on.`
+          : 'If that is steady, recalibrate in Settings, under Listening on.');
     }
     else verdict = `Centered on the beat; your spread was ±${ms(R.sd)} ms.`;
     return `<div class="card result">
@@ -1045,7 +1045,7 @@
     calib.taps = []; calib.clicks = [];
     for (let i = 0; i < 16; i++) { click(t + i * beat, i % 4 === 0); calib.clicks.push(t + i * beat); }
     phase = 'calibrating';
-    $('calibMsg').textContent = 'Listen for 4 clicks, then tap along with the next 12.';
+    $('calibMsg').textContent = 'Listen for 4 clicks, then tap along.';
     $('calibPad').hidden = false;
     setButtons();
     setTimeout(() => {
@@ -1058,14 +1058,14 @@
         if (best !== null) errs.push(best);
       });
       if (errs.length < 6) {
-        $('calibMsg').textContent = `Only ${errs.length} taps matched the clicks. Try again and tap with every click.`;
+        $('calibMsg').textContent = `Only ${errs.length} taps matched. Try again.`;
       } else {
         errs.sort((a, b) => a - b);
         const med = errs[Math.floor(errs.length / 2)];
         S.offsets[S.output] = Math.round(med * 1000 / 5) * 5;
         S.calibClick[S.output] = !!S.tapSound;
         $('latency').value = latencyMs(); save(); syncSettings();
-        $('calibMsg').textContent = `Offset for ${OUTPUT_NAME[S.output]} set to ${latencyMs()} ms from ${errs.length} taps.`;
+        $('calibMsg').textContent = `Offset for ${OUTPUT_NAME[S.output]} set to ${latencyMs()} ms.`;
       }
       setButtons();
       if (pendingRender) render();
@@ -1262,19 +1262,19 @@
     $('metro').setAttribute('aria-checked', String(!!S.metro));
     $('tapSoundSw').setAttribute('aria-checked', String(!!S.tapSound));
     const A = acc();
-    $('accuracyHelp').textContent = `Full credit within ${Math.round(A.perfect * 1000)} ms of the note, 75% within ${Math.round(A.good * 1000)} ms.`;
+    $('accuracyHelp').textContent = `Full credit ±${Math.round(A.perfect * 1000)} ms · 75% ±${Math.round(A.good * 1000)} ms`;
     $('lowLatencySw').setAttribute('aria-checked', String(!!S.lowLatency));
     $('silentSw').setAttribute('aria-checked', String(!!S.silentMode));
     $('hideSource').setAttribute('aria-checked', String(!!S.hideSource));
     $('latency').value = latencyMs();
     $('latencyFor').textContent = `for ${OUTPUT_NAME[S.output]}`;
     $('calibWarn').textContent = calibStale()
-      ? `This offset was measured with tap clicks ${S.tapSound ? 'off' : 'on'}. Calibrate again so it matches how you play now.` : '';
+      ? `Measured with tap click ${S.tapSound ? 'off' : 'on'}: calibrate again.` : '';
     const n = pool().length;
     const levels = S.levels.slice().sort().join(', ');
     const genres = Object.keys(GENRES).filter((g) => S.genres.includes(g)).map((g) => GENRE_SHORT[g]).join(', ');
     const meters = METER_ORDER.filter((m) => S.meters.includes(m)).join(', ');
-    $('pool').innerHTML = `${n.toLocaleString()} of ${DATA.rhythms.length.toLocaleString()} real rhythms match: level ${levels}; ${meters}; ${genres}; ${S.bars.slice().sort().join(' or ')} bars.<span class="browse">Browse every rhythm in the corpus</span>`;
+    $('pool').innerHTML = `${n.toLocaleString()} of ${DATA.rhythms.length.toLocaleString()} rhythms match<span class="browse">Browse every rhythm in the corpus</span>`;
     const note = $('poolNote');
     note.textContent = `${n.toLocaleString()} matching`;
     note.title = `Level ${levels} · ${meters} · ${genres}`;

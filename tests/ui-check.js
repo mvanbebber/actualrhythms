@@ -272,6 +272,13 @@ async function performTaps(p, { lateMs = 0, skipFirst = 0 } = {}) {
     await p.fill('#tempo', '73'); await p.press('#tempo', 'Enter');
     check(await tempoNow() === 74 && await p.isHidden('#tempo') && await p.inputValue('#tempoSlider') === '74', 'typed tempo rounds to the 2-BPM grid and moves the slider');
     check(await p.isVisible('#outcome .source h3'), 'source should be visible by default');
+    // app icons and manifest are linked and load
+    const iconLinks = await p.$$eval('link[rel~="icon"], link[rel="apple-touch-icon"], link[rel="manifest"]', (ls) => ls.map((l) => l.href));
+    check(iconLinks.length === 4, `expected 4 icon/manifest links, got ${iconLinks.length}`);
+    for (const href of iconLinks) {
+      const st = await p.evaluate((u) => fetch(u).then((r) => r.status), href);
+      check(st === 200, `${href} returned ${st}`);
+    }
     // Original: an excerpt with a known tempo plays at it; the slider switches it off
     {
       const known = await p.evaluate(() => window.RHYTHM_DATA.rhythms.findIndex((r) => r.o[0][4] && !r.f && r.m === '4/4'));

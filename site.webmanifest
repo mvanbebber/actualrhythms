@@ -1,0 +1,13 @@
+{
+  "name": "Actual Rhythms",
+  "short_name": "Actual Rhythms",
+  "description": "Rhythm sight-reading practice with rhythms from real music.",
+  "start_url": "/",
+  "theme_color": "#F6F5F1",
+  "background_color": "#F6F5F1",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

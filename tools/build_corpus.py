@@ -568,12 +568,11 @@ def main():
             if w.get('fixed'):
                 uniq[key]['f'] = 1  # natural length: shown whatever Length is set to
         u = uniq[key]
-        # the same bar of the same part counted again (a score that reuses bar numbers, e.g. in
-        # repeat endings or a repeated section) is one occurrence, not several
-        where = (occ[0], occ[1], occ[2])
-        if where in u.setdefault('seen', set()):
+        # a rhythm counts once per piece: its first passage there stands for the piece (repeats,
+        # recapitulations and other parts playing the same rhythm aren't new occurrences)
+        if occ[0] in u.setdefault('seen', set()):
             continue
-        u['seen'].add(where)
+        u['seen'].add(occ[0])
         u['n'] += 1
         u.setdefault('all', []).append(occ)  # every occurrence, for the lazily loaded data/occurrences.js
         if len(u['o']) < args.max_sources and all(o[0] != occ[0] for o in u['o']):
@@ -588,8 +587,8 @@ def main():
     for k, u in uniq.items():
         if u.get('f'):
             for other in sorted(by_onsets.get(latin.onset_signature(u['m'], u['r']), []), key=lambda x: -x['n']):
-                u['n'] += other['n']
-                u['all'] = u.get('all', []) + other['all']
+                u['all'] = u.get('all', []) + [o for o in other['all'] if o[0] not in {q[0] for q in u['all']}]
+                u['n'] = len(u['all'])
                 for o in other['o']:
                     if len(u['o']) < args.max_sources and all(o[0] != q[0] for q in u['o']):
                         u['o'].append([o[0], o[1], o[2], [list(m) for m in o[3]]] + o[4:])  # a copy: encoded separately below
@@ -627,6 +626,11 @@ def main():
             for i in idxs:
                 items[i]['g'] = n_fam
             n_fam += 1
+    for idxs in fam.values():
+        if len(idxs) > 1:
+            pieces = {o[0] for i in idxs for o in items[i]['all']}
+            for i in idxs:
+                items[i]['gn'] = len(pieces)  # pieces using this rhythm in any spelling
     print(f'{n_fam} rhythm families group {sum(len(v) for v in fam.values() if len(v) > 1)} rhythms written more than one way', file=sys.stderr)
 
     # every occurrence beyond the few kept in rhythms.js, loaded only when someone asks to see them all
@@ -645,9 +649,9 @@ def main():
         u.pop('seen', None)
         for o in u.pop('all', []):
             k = (o[0], o[1], o[2])
-            if k in done:
+            if o[0] in done:
                 continue
-            done.add(k)
+            done.add(o[0])
             if kept[k]:
                 kept[k] -= 1
                 continue

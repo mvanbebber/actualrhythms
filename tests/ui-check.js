@@ -364,7 +364,7 @@ async function performTaps(p, { lateMs = 0, skipFirst = 0 } = {}) {
       const fam = await p.evaluate(() => {
         const R = window.RHYTHM_DATA.rhythms;
         const i = R.findIndex((r) => r.g != null && r.n > r.o.length && R.some((x) => x !== r && x.g === r.g && x.m !== r.m));
-        const sum = R.filter((x) => x.g === R[i].g).reduce((a, x) => a + x.n, 0);
+        const sum = R[i].gn;
         return { i, sum, meters: [...new Set(R.filter((x) => x.g === R[i].g).map((x) => x.m))] };
       });
       await p.evaluate((i) => window.actualRhythms.show(i), fam.i);
@@ -372,7 +372,8 @@ async function performTaps(p, { lateMs = 0, skipFirst = 0 } = {}) {
       await p.click('#outcome .source [data-action="family"] >> nth=0');
       await p.waitForSelector('#corpus:not([hidden]) .c-row');
       const txt = await p.textContent('#corpusFamilyText');
-      check(txt.includes(`${fam.sum.toLocaleString('en-US')} passage`), `family view should list all ${fam.sum} passages: "${txt}"`);
+      check(txt.includes(`Every piece with this rhythm: ${fam.sum.toLocaleString('en-US')}`), `family view should list all ${fam.sum} pieces: "${txt}"`);
+      check(await p.textContent('#corpusCount') === `${fam.sum.toLocaleString('en-US')} pieces`, 'one row per piece');
       check((await p.$$('.c-row')).length > 0, 'family view should render rows');
       await p.click('#corpusWhole');
       check((await p.textContent('#corpusCount')).includes('rhythms in the corpus'), 'Show the whole corpus should leave the family view');
@@ -386,7 +387,7 @@ async function performTaps(p, { lateMs = 0, skipFirst = 0 } = {}) {
       await rowsNow[rowsNow.length - 1].click();
       await p.waitForTimeout(300);
       check(await p.isHidden('#corpus') && await p.isVisible('#outcome .source h3'), 'choosing a passage from the family view should load it');
-      console.log(`  family of ${fam.sum} passages in ${fam.meters.join(', ')}`);
+      console.log(`  family of ${fam.sum} pieces in ${fam.meters.join(', ')}`);
     }
     // the source card has its own link to the whole corpus
     await p.click('#outcome .source [data-action="corpus"]');

@@ -988,9 +988,9 @@
     const tempoLine = q ? `<p>Tempo: ${originalTempo()} BPM${current.mi.compound ? ` (dotted-${current.mi.den === 8 ? 'quarter' : 'half'} beat)` : ''}, ${
       folder === 'wjd' ? 'the average tempo of the recording' : 'from the metronome mark in the score'}.</p>` : '';
     // one link to the full list: this spelling's count, plus the same proportions written other ways
-    const altText = alt.n ? `, and ${alt.n} more time${alt.n > 1 ? 's' : ''} written another way (${esc(altMeters)}) with the same proportions` : '';
+    const altText = alt.n ? `, and in ${alt.n} more written another way (${esc(altMeters)}) with the same proportions` : '';
     const occurs = item.n > 1 || alt.n
-      ? seeAll(`This rhythm occurs ${item.n === 1 ? 'once' : `${item.n} times`} in the corpus${altText}. See them all`)
+      ? seeAll(`This rhythm is in ${item.n} piece${item.n === 1 ? '' : 's'} in the corpus${altText}. See them all`)
       : 'This rhythm is unique to one piece in the corpus.';
     return `<div class="source">
       <div class="eyebrow">Where this rhythm comes from</div>
@@ -1466,7 +1466,7 @@
     const where = [src[3], src[4]].filter(Boolean).join(' · ');
     return `<div class="c-thumb">${thumbSVG(item, thumbW)}</div>
       <div class="c-meta">
-        <span class="c-chips"><span class="chip">${item.m}</span><span class="chip">Level ${item.l}</span><span class="chip">${item.b} bar${item.b > 1 ? 's' : ''}</span>${item.n > 1 ? `<span class="c-n">occurs ${item.n}×</span>` : ''}</span>
+        <span class="c-chips"><span class="chip">${item.m}</span><span class="chip">Level ${item.l}</span><span class="chip">${item.b} bar${item.b > 1 ? 's' : ''}</span>${item.n > 1 ? `<span class="c-n">in ${item.n} pieces</span>` : ''}</span>
         <span class="c-src"><b>${esc(src[0])}</b>${src[1] ? ' · ' + esc(src[1]) : ''}${where ? ' · ' + esc(where) : ''}</span>
       </div>`;
   }
@@ -1508,9 +1508,9 @@
     const songs = new Set(rows.map((r) => r.occ[0])).size;
     const spellings = familyOf(item).length;
     $('corpusFamilyBar').hidden = false;
-    $('corpusFamilyText').textContent = `Every occurrence of this rhythm: ${total.toLocaleString()} passage${total === 1 ? '' : 's'}`
+    $('corpusFamilyText').textContent = `Every piece with this rhythm: ${total.toLocaleString()}`
       + (spellings > 1 ? `, written ${spellings} ways with the same proportions` : '');
-    $('corpusCount').textContent = `${rows.length.toLocaleString()} passage${rows.length === 1 ? '' : 's'} from ${songs.toLocaleString()} piece${songs === 1 ? '' : 's'}`
+    $('corpusCount').textContent = `${songs.toLocaleString()} piece${songs === 1 ? '' : 's'}`
       + (q ? ` for “${$('corpusSearch').value.trim()}”` : '');
     $('corpusSpacer').style.height = (rows.length * CORPUS_ROW) + 'px';
     $('corpusSpacer').querySelectorAll('.c-empty').forEach((e) => e.remove());
@@ -1582,7 +1582,8 @@
   // other ways this rhythm is written, and how often they occur
   function otherSpellings(item) {
     const others = familyOf(item).filter((r) => r !== item);
-    return { others, n: others.reduce((a, r) => a + r.n, 0) };
+    // pieces that use it only in another spelling (a piece is counted once, whichever way it writes it)
+    return { others, n: item.gn != null ? Math.max(0, item.gn - item.n) : 0 };
   }
   let occPromise = null;
   function loadOccurrences() {
@@ -1618,7 +1619,12 @@
   function familyRows(item) {
     const fam = familyOf(item).slice().sort((a, b) => (a === item ? -1 : b === item ? 1 : b.n - a.n));
     const rows = [];
-    fam.forEach((it) => allOccurrences(it).forEach((occ) => rows.push({ item: it, occ })));
+    const pieces = new Set(); // one row per piece, in the first spelling it uses
+    fam.forEach((it) => allOccurrences(it).forEach((occ) => {
+      if (pieces.has(occ[0])) return;
+      pieces.add(occ[0]);
+      rows.push({ item: it, occ });
+    }));
     return rows;
   }
 

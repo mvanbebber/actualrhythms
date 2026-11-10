@@ -760,9 +760,10 @@
     const ph = $('playhead'); const ci = $('countin');
     if (now < run.t0) {
       const b = Math.floor((now - run.start) / run.beatSec);
-      ci.hidden = b < 0; ci.textContent = b >= 0 ? String(b + 1) : '';
+      ci.hidden = b < 0;
+      if (ci.dataset.b !== String(b)) { ci.dataset.b = String(b); ci.innerHTML = b >= 0 ? `${b + 1}<small>then ${reps()}× through</small>` : ''; }
       ph.hidden = true;
-      setPadStatus('countin', b >= 0 ? `Count-in ${b + 1} of ${run.countBeats}` : 'Get ready');
+      setPadStatus('countin', b >= 0 ? `Count-in ${b + 1} of ${run.countBeats} · then ${reps()}× through` : `Get ready · plays ${reps()}×`);
     } else {
       ci.hidden = true;
       phase = run.mode === 'play' ? 'playing' : 'listening';
@@ -797,7 +798,7 @@
     if (run && run.raf) cancelAnimationFrame(run.raf);
     stopAudio();
     run = null; phase = 'idle';
-    $('playhead').hidden = true; $('countin').hidden = true;
+    $('playhead').hidden = true; $('countin').hidden = true; $('countin').dataset.b = '';
     if (pendingRender) render(); // a resize happened during the attempt
     if (!silent) setButtons();
   }
@@ -1034,7 +1035,7 @@
       if (!current) setPadStatus('empty', 'No rhythms match these settings');
       else if (phase === 'calibrating') setPadStatus('calibrating', 'Calibrating: tap with the clicks');
       else if (loadingMode) setPadStatus('loading', 'Loading piano…');
-      else setPadStatus(lastResult ? 'done' : 'ready', lastResult ? 'Tap or press Start to try again' : 'Press Start, or just start tapping');
+      else setPadStatus(lastResult ? 'done' : 'ready', lastResult ? `Tap or press Start to try again · plays ${reps()}×` : `Press Start, or just start tapping · plays ${reps()}×`);
     }
   }
 
@@ -1049,117 +1050,49 @@
   function renderMeta() {
     if (!current) { $('metaChips').innerHTML = ''; return; }
     const { item } = current;
-    $('metaChips').innerHTML = `<span class="chip">${item.m}</span><span class="chip" title="${LEVELS[item.l][0]}: ${esc(LEVELS[item.l][1])}">Level ${item.l}</span><span class="chip">${item.b} bar${item.b > 1 ? 's' : ''}</span>`;
+    const [title, composer] = DATA.sources[current.occ[0]];
+    const name = S.hideSource && !lastResult ? '' : `<span class="meta-source" title="${esc(title)}${composer ? ' · ' + esc(composer) : ''}">${esc(title)}${composer ? ` <em>${esc(composer)}</em>` : ''}</span>`;
+    const scoreChip = lastResult ? `<span class="chip score-chip" title="Score for your last attempt">${lastResult.pct}%</span>` : '';
+    $('metaChips').innerHTML = `<span class="chip">${item.m}</span><span class="chip" title="${LEVELS[item.l][0]}: ${esc(LEVELS[item.l][1])}">Level ${item.l}</span><span class="chip">${item.b} bar${item.b > 1 ? 's' : ''}</span>${scoreChip}${name}`;
   }
 
   // ---------- tempo ----------
-  // ---------- tempo wheel: flick/scroll/drag to spin, tap a number to jump, tap the centre to type ----------
+  // ---------- tempo: a slider, plus the number itself, which opens exact entry ----------
   const TEMPO_MIN = 40; const TEMPO_MAX = 200; const TEMPO_STEP = 2;
-  let wheelSync = false; // true while the app scrolls the wheel itself
-  const wheel = () => $('tempoWheel');
-  const itemW = () => { const el = wheel().firstElementChild; return el ? el.getBoundingClientRect().width : 38; };
   const clampTempo = (v) => Math.max(TEMPO_MIN, Math.min(TEMPO_MAX, Math.round((Number(v) || S.tempo) / TEMPO_STEP) * TEMPO_STEP));
-  function markWheel() {
-    const w = wheel();
-    w.querySelectorAll('.on').forEach((el) => el.classList.remove('on'));
-    const el = w.children[(S.tempo - TEMPO_MIN) / TEMPO_STEP];
-    if (el) el.classList.add('on');
-    w.setAttribute('aria-valuenow', S.tempo);
-    w.setAttribute('aria-valuetext', `${S.tempo} beats per minute`);
-    $('tempo').value = S.tempo;
-  }
-  function scrollWheelTo(t, smooth) {
-    wheelSync = true;
-    wheel().scrollTo({ left: ((t - TEMPO_MIN) / TEMPO_STEP) * itemW(), behavior: smooth ? 'smooth' : 'auto' });
-    clearTimeout(scrollWheelTo.timer);
-    scrollWheelTo.timer = setTimeout(() => { wheelSync = false; }, smooth ? 450 : 60);
-  }
-  function setTempo(v, opts = {}) {
+  function setTempo(v) {
     const t = clampTempo(v);
     if (t !== S.tempo) { S.tempo = t; save(); }
-    markWheel();
-    if (!opts.fromScroll) scrollWheelTo(t, opts.smooth);
+    $('tempoSlider').value = t;
+    $('tempoSlider').setAttribute('aria-valuetext', `${t} beats per minute`);
+    $('tempoNum').textContent = t;
+    $('tempo').value = t;
   }
-  function openTempoInput(initial) {
+  function openTempoInput() {
+    $('tempoValue').hidden = true;
     const inp = $('tempo');
     inp.hidden = false;
-    inp.value = initial != null ? initial : S.tempo;
+    inp.value = S.tempo;
     inp.focus();
-    if (initial == null) inp.select();
+    inp.select();
   }
   function closeTempoInput(commit) {
     const inp = $('tempo');
     if (inp.hidden) return;
-    if (commit) setTempo(inp.value, { smooth: true });
+    if (commit) setTempo(inp.value);
     inp.hidden = true;
-    wheel().focus({ preventScroll: true });
+    $('tempoValue').hidden = false;
+    $('tempoValue').focus({ preventScroll: true });
   }
-  function setupTempoWheel() {
-    const w = wheel();
-    let html = '';
-    for (let t = TEMPO_MIN; t <= TEMPO_MAX; t += TEMPO_STEP) html += `<span class="tw-item${t % 10 === 0 ? ' major' : ''}" data-v="${t}">${t}</span>`;
-    w.innerHTML = html;
-    // follow the wheel as it moves (touch momentum, trackpad, drag)
-    let raf = 0;
-    w.addEventListener('scroll', () => {
-      if (wheelSync) return;
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => setTempo(TEMPO_MIN + Math.round(w.scrollLeft / itemW()) * TEMPO_STEP, { fromScroll: true }));
-    }, { passive: true });
-    // a mouse wheel spins it (vertical wheel movement scrolls the strip sideways)
-    w.addEventListener('wheel', (e) => {
-      e.preventDefault();
-      w.scrollLeft += Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
-    }, { passive: false });
-    // mouse drag (touch uses native scrolling)
-    let drag = null;
-    w.addEventListener('pointerdown', (e) => {
-      if (e.pointerType !== 'mouse' || e.button !== 0) return;
-      drag = { x: e.clientX, left: w.scrollLeft, moved: false, id: e.pointerId };
-    });
-    w.addEventListener('pointermove', (e) => {
-      if (!drag) return;
-      const dx = e.clientX - drag.x;
-      if (!drag.moved && Math.abs(dx) > 4) {
-        // only now is it a drag: capture the pointer (a plain click must still reach the number under it)
-        drag.moved = true;
-        w.style.scrollSnapType = 'none';
-        try { w.setPointerCapture(drag.id); } catch (err) { /* ignore */ }
-      }
-      if (drag.moved) w.scrollLeft = drag.left - dx;
-    });
-    const endDrag = () => {
-      if (!drag) return;
-      w.style.scrollSnapType = '';
-      if (drag.moved) { scrollWheelTo(S.tempo, true); w.dataset.dragged = '1'; setTimeout(() => { delete w.dataset.dragged; }, 0); }
-      drag = null;
-    };
-    w.addEventListener('pointerup', endDrag);
-    w.addEventListener('pointercancel', endDrag);
-    // taps: a number jumps there; the centre number opens typing
-    w.addEventListener('click', (e) => {
-      if (w.dataset.dragged) return;
-      const item = e.target.closest('.tw-item');
-      if (!item) return;
-      const v = Number(item.dataset.v);
-      if (v === S.tempo) openTempoInput(); else setTempo(v, { smooth: true });
-    });
-    w.addEventListener('keydown', (e) => {
-      const step = { ArrowRight: 2, ArrowUp: 2, ArrowLeft: -2, ArrowDown: -2, PageUp: 10, PageDown: -10 }[e.key];
-      if (step) { e.preventDefault(); setTempo(S.tempo + step, { smooth: false }); }
-      else if (e.key === 'Home') { e.preventDefault(); setTempo(TEMPO_MIN); }
-      else if (e.key === 'End') { e.preventDefault(); setTempo(TEMPO_MAX); }
-      else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openTempoInput(); }
-      else if (/^[0-9]$/.test(e.key)) { e.preventDefault(); openTempoInput(e.key); }
-    });
+  function setupTempo() {
+    $('tempoSlider').addEventListener('input', (e) => setTempo(e.target.value));
+    $('tempoValue').addEventListener('click', openTempoInput);
     const inp = $('tempo');
     inp.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') { e.preventDefault(); closeTempoInput(true); }
       else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeTempoInput(false); }
     });
     inp.addEventListener('blur', () => closeTempoInput(true));
-    // keep the current tempo centred whenever the wheel changes size
-    if (window.ResizeObserver) new ResizeObserver(() => scrollWheelTo(S.tempo, false)).observe(w);
     setTempo(S.tempo);
   }
 
@@ -1269,7 +1202,7 @@
       updateSoundStatus();
     });
     if (!IS_IOS) { $('silentRow').hidden = true; $('silentHelp').hidden = true; }
-    $('hideSource').addEventListener('click', () => { S.hideSource = !S.hideSource; save(); syncSettings(); renderOutcome(); setButtons(); });
+    $('hideSource').addEventListener('click', () => { S.hideSource = !S.hideSource; save(); syncSettings(); renderOutcome(); renderMeta(); setButtons(); });
     $('latency').addEventListener('change', (e) => { S.offsets[S.output] = Math.max(-300, Math.min(500, Number(e.target.value) || 0)); save(); syncSettings(); });
     toggleGroup($('outputs'), [{ val: 'speaker', label: 'Speaker / wired' }, { val: 'bluetooth', label: 'Bluetooth' }], 'output', false, false);
     // runs after the button's own handler has set S.output: bring that output's tap-click setting with it
@@ -1527,7 +1460,7 @@
   // ---------- wiring (runs once) ----------
   function setupUI() {
     buildSettings();
-    setupTempoWheel();
+    setupTempo();
     $('btnPlay').addEventListener('click', () => (run ? stopRun() : startRun('play')));
     $('btnListen').addEventListener('click', () => startRun('listen'));
     $('btnNext').addEventListener('click', () => { if (run) stopRun(true); stepHistory(1); setButtons(); });

@@ -141,41 +141,20 @@ kbd {
 .controls { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
 .transport { display: flex; gap: var(--s2); flex-wrap: wrap; }
 .tempo { display: flex; align-items: center; gap: var(--s2); }
-.tempo-wheel {
-  --tw-item: 38px;
-  position: relative; width: 220px; height: var(--control-h); flex: none;
-  border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); overflow: hidden;
+.tempo-slider { width: 200px; height: var(--control-h); margin: 0; accent-color: var(--teal); cursor: pointer; touch-action: pan-x; }
+.tempo-value {
+  min-height: var(--control-h); min-width: 84px; padding: 0 var(--s3);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface);
+  font-weight: 700; font-size: 16px; font-variant-numeric: tabular-nums; white-space: nowrap;
 }
-/* the centre slot */
-.tempo-wheel::after {
-  content: ""; position: absolute; top: 4px; bottom: 4px; left: calc(50% - var(--tw-item) / 2 - 2px); width: calc(var(--tw-item) + 4px);
-  border-radius: 6px; background: var(--teal-pale); pointer-events: none; z-index: 0;
+.tempo-value:hover { border-color: var(--teal); }
+.tempo-unit { font-weight: 600; font-size: 13px; color: var(--muted); }
+.tempo-input {
+  width: 84px; min-height: var(--control-h); padding: 0;
+  border: 2px solid var(--teal); border-radius: var(--radius-sm); background: var(--surface);
+  text-align: center; font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; -moz-appearance: textfield; appearance: textfield;
 }
-.tw-scroll {
-  position: relative; z-index: 1; height: 100%;
-  display: flex; align-items: center; overflow-x: auto; overflow-y: hidden;
-  scroll-snap-type: x mandatory; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch;
-  padding-inline: calc(50% - var(--tw-item) / 2); scrollbar-width: none; touch-action: pan-x;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
-  cursor: grab;
-}
-.tw-scroll::-webkit-scrollbar { display: none; }
-.tw-scroll:focus-visible { outline: none; }
-.tempo-wheel:has(.tw-scroll:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
-.tw-item {
-  flex: none; width: var(--tw-item); scroll-snap-align: center; text-align: center; user-select: none; -webkit-user-select: none;
-  font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; line-height: 1;
-}
-.tw-item.major { color: var(--ink); font-weight: 600; }
-.tw-item.on { color: var(--teal); font-size: 18px; font-weight: 700; }
-.tw-input {
-  position: absolute; z-index: 2; top: 3px; bottom: 3px; left: calc(50% - 28px); width: 56px;
-  border: 2px solid var(--teal); border-radius: 6px; background: var(--surface); text-align: center;
-  font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; -moz-appearance: textfield; appearance: textfield; padding: 0;
-}
-.tw-input::-webkit-outer-spin-button, .tw-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-.tempo-unit { font-weight: 600; font-size: 14px; }
+.tempo-input::-webkit-outer-spin-button, .tempo-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .tempo-beat { color: var(--muted); font-size: 12px; }
 .tempo-beat:empty { display: none; }
 
@@ -469,7 +448,7 @@ html[data-touch][data-layout="phone-landscape"] .stage { display: contents; }
 html[data-touch][data-layout="phone-landscape"] .score-col { grid-column: 1; grid-row: 1; }
 html[data-touch][data-layout="phone-landscape"] .pad { grid-column: 2; grid-row: 1 / span 2; min-height: 0; }
 html[data-touch][data-layout="phone-landscape"] .outcome { grid-column: 1; grid-row: 2; }
-html[data-touch][data-layout="phone-landscape"] .sheet { max-height: 124px; } /* one staff row; longer excerpts scroll inside and follow the playhead */
+html[data-touch][data-layout="phone-landscape"] .sheet { max-height: 164px; } /* one staff row with up to four feedback lanes */ /* one staff row; longer excerpts scroll inside and follow the playhead */
 html[data-touch][data-layout="phone-landscape"] .score-col { gap: 6px; }
 
 /* fixed header metrics so updating the practice count never nudges the score or pad */
@@ -482,7 +461,8 @@ html[data-layout="medium"] .wordmark, html[data-layout="wide"] .wordmark { line-
 html[data-layout="phone-landscape"] .transport .btn { padding: 0 10px; gap: 6px; }
 html[data-layout="phone-landscape"] .tempo { gap: 4px; padding-left: var(--s2); }
 html[data-layout="phone-landscape"] .tempo-unit { display: none; }
-html[data-layout="phone-landscape"] .tempo-wheel { width: 150px; --tw-item: 34px; }
+html[data-layout="phone-landscape"] .tempo-slider { width: 96px; }
+html[data-layout="phone-landscape"] .tempo-value, html[data-layout="phone-landscape"] .tempo-input { min-width: 0; width: 56px; padding: 0 4px; }
 
 .legend .lg { white-space: nowrap; }
 .legend .lg::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--c); margin: 0 4px 0 2px; vertical-align: 0; }
@@ -535,5 +515,16 @@ html[data-layout="phone-landscape"] .tempo-wheel { width: 150px; --tw-item: 34px
 .calib-warn { margin: 0; font-size: 13px; color: var(--off); font-weight: 500; }
 .calib-warn:empty { display: none; }
 
-html[data-layout="phone"] .tempo-wheel { width: min(260px, 70vw); }
-@media (prefers-reduced-motion: reduce) { .tw-scroll { scroll-behavior: auto; } }
+html[data-layout="phone"] .tempo { align-self: stretch; }
+html[data-layout="phone"] .tempo-slider { flex: 1; min-width: 0; width: auto; }
+
+/* top line: chips, the piece's name, and the last score */
+.meta-chips { flex-wrap: nowrap; flex: 1 1 auto; align-items: center; }
+.meta-source {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font: 400 15px/1.2 var(--font-serif); color: var(--ink); padding-left: 4px;
+}
+.meta-source em { color: var(--muted); }
+.chip.score-chip { background: var(--teal); color: #fff; font-weight: 700; flex: none; }
+html[data-layout="phone"] .pool-note, html[data-layout="phone-landscape"] .pool-note { display: none; }
+#countin small { display: block; font: 600 14px/1.2 var(--font-sans); color: var(--teal); margin-top: 6px; text-align: center; }

@@ -89,7 +89,7 @@ async function performTaps(p, { lateMs = 0, skipFirst = 0 } = {}) {
     }));
     check(info.layout === expect, `layout ${info.layout}, expected ${expect}`);
     check(info.sw <= info.cw, `horizontal overflow ${info.sw} > ${info.cw}`);
-    for (const sel of ['.sheet', '#btnPlay', '#btnListen', '#btnNext', '.tempo-wheel', '#pad']) {
+    for (const sel of ['.sheet', '#btnPlay', '#btnListen', '#btnNext', '#tempoValue', '#pad']) {
       const b = await box(p, sel);
       check(b.x >= 0 && b.x + b.w <= w + 0.5, `${sel} clipped horizontally (${Math.round(b.x)}..${Math.round(b.x + b.w)})`);
       if (touch && sel.startsWith('#') && sel !== '#pad') check(b.h >= 44 && b.w >= 44, `${sel} touch target ${Math.round(b.w)}x${Math.round(b.h)}`);
@@ -100,7 +100,7 @@ async function performTaps(p, { lateMs = 0, skipFirst = 0 } = {}) {
       check(pad.x > sheet.x + sheet.w, 'landscape: pad is not to the right of the score');
       check(pad.y + Math.min(pad.h, 160) <= h && ctl.y + ctl.h <= h, 'landscape: controls or pad below the fold');
       check(await p.$eval('.pad-label .short', (e) => getComputedStyle(e).display !== 'none'), 'landscape pad label should read "Tap"');
-      const up = await box(p, '.tempo-wheel');
+      const up = await box(p, '#tempoValue');
       check(up.x + up.w <= pad.x - 4, `landscape: tempo controls run under the Tap pad (${Math.round(up.x + up.w)} > ${Math.round(pad.x)})`);
     } else check(await p.$eval('.pad-label .long', (e) => getComputedStyle(e).display !== 'none'), 'pad label should read "Tap the rhythm"');
     const svgW = await p.$eval('#score svg', (s) => s.getBoundingClientRect().width);
@@ -259,24 +259,18 @@ async function performTaps(p, { lateMs = 0, skipFirst = 0 } = {}) {
     await p.keyboard.press('ArrowRight'); const b = await p.evaluate(() => window.actualRhythms.current.item.r.join('|'));
     await p.keyboard.press('ArrowLeft'); const a2 = await p.evaluate(() => window.actualRhythms.current.item.r.join('|'));
     check(a !== b && a === a2, 'arrow keys do not step forward and back');
-    // tempo wheel: arrows step, the centre opens typing, numbers jump, the mouse wheel spins it
+    // tempo: the slider moves in steps of 2; the number opens exact entry
     const tempoNow = () => p.evaluate(() => JSON.parse(localStorage.getItem('rr.settings')).tempo);
-    await p.focus('#tempoWheel');
+    await p.focus('#tempoSlider');
     const ex0 = await p.evaluate(() => window.actualRhythms.current.item.r.join('|'));
     await p.keyboard.press('ArrowRight'); await p.keyboard.press('ArrowRight');
-    check(await tempoNow() === 124, 'arrow keys on the wheel step the tempo');
-    check(await p.evaluate(() => window.actualRhythms.current.item.r.join('|')) === ex0, 'arrows on the wheel must not change the rhythm');
-    await p.click('#tempoWheel .tw-item.on');
-    check(await p.isVisible('#tempo'), 'tapping the centre number should open typing');
+    check(await tempoNow() === 124, 'arrow keys on the slider step the tempo');
+    check(await p.evaluate(() => window.actualRhythms.current.item.r.join('|')) === ex0, 'arrows on the slider must not change the rhythm');
+    check(await p.textContent('#tempoNum') === '124', 'the number shows the slider tempo');
+    await p.click('#tempoValue');
+    check(await p.isVisible('#tempo'), 'clicking the number should open exact entry');
     await p.fill('#tempo', '73'); await p.press('#tempo', 'Enter');
-    check(await tempoNow() === 74 && await p.isHidden('#tempo'), 'typed tempo should round to the 2-BPM grid and close');
-    await p.click('#tempoWheel .tw-item[data-v="80"]', { force: true });
-    await p.waitForTimeout(600);
-    check(await tempoNow() === 80, 'clicking a visible number jumps to it');
-    await p.hover('#tempoWheel');
-    await p.mouse.wheel(0, 380); await p.waitForTimeout(500);
-    check(await tempoNow() > 80, 'the mouse wheel should spin the tempo up');
-    await p.keyboard.press('Escape');
+    check(await tempoNow() === 74 && await p.isHidden('#tempo') && await p.inputValue('#tempoSlider') === '74', 'typed tempo rounds to the 2-BPM grid and moves the slider');
     check(await p.isVisible('#outcome .source h3'), 'source should be visible by default');
     await p.click('#advanced summary');
     await p.click('#hideSource');
@@ -334,12 +328,14 @@ async function performTaps(p, { lateMs = 0, skipFirst = 0 } = {}) {
     await p.waitForTimeout(300);
     check(await p.isHidden('#corpus'), 'choosing a rhythm should close the corpus');
     check(await p.evaluate(() => window.actualRhythms.current.item.l) === 5, 'the chosen rhythm should load for practice');
-    await p.click('#poolNote');
-    await p.waitForSelector('#corpus:not([hidden])');
-    check(/matching/.test(await p.textContent('#corpusCount')), 'the matching note should open the corpus filtered to matching rhythms');
-    await p.keyboard.press('Escape');
-    check(await p.isHidden('#corpus'), 'Escape should close the corpus');
-    check(await p.evaluate(() => document.activeElement.id) === 'poolNote', 'focus should return to what opened the corpus');
+    if (label !== 'phone') { // phones hide the 'N matching' note to save room; Settings has the same link
+      await p.click('#poolNote');
+      await p.waitForSelector('#corpus:not([hidden])');
+      check(/matching/.test(await p.textContent('#corpusCount')), 'the matching note should open the corpus filtered to matching rhythms');
+      await p.keyboard.press('Escape');
+      check(await p.isHidden('#corpus'), 'Escape should close the corpus');
+      check(await p.evaluate(() => document.activeElement.id) === 'poolNote', 'focus should return to what opened the corpus');
+    }
     check(p.errors.length === 0, 'page errors: ' + p.errors.join(' | '));
     await p.context().close();
   }
@@ -362,7 +358,7 @@ async function performTaps(p, { lateMs = 0, skipFirst = 0 } = {}) {
         check(b.y >= 0 && b.y + Math.min(b.h, 200) <= vh + 1, `${sel} not on screen (top ${Math.round(b.y)}, height ${Math.round(b.h)}, viewport ${vh})`);
       }
       if (dev.includes('iPhone') && dev.includes('landscape')) {
-        const up = await box(p, '.tempo-wheel'); const pd = await box(p, '#pad');
+        const up = await box(p, '#tempoValue'); const pd = await box(p, '#pad');
         check(up.x + up.w <= pd.x - 4, `tempo controls run under the Tap pad (${Math.round(up.x + up.w)} > ${Math.round(pd.x)})`);
       }
       const out = await box(p, '#outcome');

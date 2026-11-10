@@ -46,7 +46,7 @@
   }
   const S = Object.assign({
     tempo: 80, levels: [1], bars: [2, 4], meters: ['2/4', '3/4', '4/4', '6/8'],
-    genres: Object.keys(GENRES), metro: true, hideSource: false, latency: 0, tapSound: true, silentMode: true, lowLatency: true,
+    genres: Object.keys(GENRES), useOriginal: false, metro: true, hideSource: false, latency: 0, tapSound: true, silentMode: true, lowLatency: true,
   }, saved, { v: SETTINGS_VERSION });
   // separate saved timing offsets per output: Bluetooth headphones add 150-250 ms
   if (!S.offsets || typeof S.offsets !== 'object') {
@@ -757,7 +757,15 @@
   // ---------- run an excerpt ----------
   let run = null; // {t0, secPerTick, taps, mode, raf, endAt}
 
-  function secPerTick() { return 60 / S.tempo / current.mi.beat; }
+  // The excerpt's own tempo, in the app's beats (the meter's beat), when the source gives one: the
+  // metronome mark in the score, or the recording's average tempo (jazz solos).
+  function originalTempo() {
+    if (!current || !current.occ[4]) return null;
+    return Math.round(current.occ[4] * TPQ / current.mi.beat);
+  }
+  // Original on and known: play at it; otherwise the slider's tempo.
+  const tempoNow = () => (S.useOriginal && originalTempo()) || S.tempo;
+  function secPerTick() { return 60 / tempoNow() / current.mi.beat; }
 
   let loadingToken = 0;
   async function startRun(mode) {
@@ -975,13 +983,16 @@
     }).join('');
     const extra = item.n - item.o.length;
     const more = extra > 0 ? `<p>Plus ${extra} more occurrence${extra > 1 ? 's' : ''} across the corpus.</p>` : '';
+    const q = occ[4];
+    const tempoLine = q ? `<p>Tempo: ${originalTempo()} BPM${current.mi.compound ? ` (dotted-${current.mi.den === 8 ? 'quarter' : 'half'} beat)` : ''}, ${
+      folder === 'wjd' ? 'the average tempo of the recording' : 'from the metronome mark in the score'}.</p>` : '';
     const occurs = item.n > 1 ? `This rhythm occurs ${item.n} times in the corpus.` : 'This rhythm is unique to one piece in the corpus.';
     return `<div class="source">
       <div class="eyebrow">Where this rhythm comes from</div>
       <h3>${esc(title)}${composer ? ` <em>${esc(composer)}</em>` : ''}</h3>
       ${where ? `<p class="where">${where}</p>` : ''}
       <p>${[part.replace(/, $/, ''), bars].filter(Boolean).join(', ')}${from}${note ? ` · ${esc(note)}` : ''}</p>
-      <p>${occurs}</p>
+      ${tempoLine}<p>${occurs}</p>
       ${others ? `<div class="eyebrow">Also found in</div><ul>${others}</ul>` : ''}${more}
     </div>`;
   }
@@ -1094,7 +1105,7 @@
       melody.querySelector('span').textContent = loadingMode === 'melody' ? 'Loading piano…' : 'Hear the melody';
       melody.disabled = phase === 'calibrating' || !!loadingMode;
     }
-    $('tempo').value = S.tempo;
+    showTempo();
     const mi = current && current.mi;
     $('tempoBeat').textContent = mi && mi.compound ? (mi.den === 8 ? 'dotted-quarter beat' : 'dotted-half beat') : '';
     if (!running) {
@@ -1126,19 +1137,36 @@
   // ---------- tempo: a slider, plus the number itself, which opens exact entry ----------
   const TEMPO_MIN = 40; const TEMPO_MAX = 200; const TEMPO_STEP = 2;
   const clampTempo = (v) => Math.max(TEMPO_MIN, Math.min(TEMPO_MAX, Math.round((Number(v) || S.tempo) / TEMPO_STEP) * TEMPO_STEP));
-  function setTempo(v) {
+  // user's own tempo (slider or typed): it also switches Original off
+  function setTempo(v, fromUser = true) {
     const t = clampTempo(v);
     if (t !== S.tempo) { S.tempo = t; save(); }
-    $('tempoSlider').value = t;
-    $('tempoSlider').setAttribute('aria-valuetext', `${t} beats per minute`);
+    if (fromUser && S.useOriginal) { S.useOriginal = false; save(); }
+    showTempo();
+  }
+  function showTempo() {
+    const orig = originalTempo();
+    const on = !!(S.useOriginal && orig);
+    const t = tempoNow();
+    $('tempoSlider').value = Math.max(TEMPO_MIN, Math.min(TEMPO_MAX, t));
+    $('tempoSlider').setAttribute('aria-valuetext', `${t} beats per minute${on ? ', the original tempo' : ''}`);
     $('tempoNum').textContent = t;
     $('tempo').value = t;
+    const b = $('btnOrig');
+    b.setAttribute('aria-pressed', String(!!S.useOriginal));
+    b.classList.toggle('na', !orig);
+    const what = current && DATA.sources[current.occ[0]][2] === 'wjd' ? "the recording's average tempo" : 'the metronome mark in the score';
+    const tip = !orig ? `Original tempo: not known for this excerpt${S.useOriginal ? `, so it plays at your ${S.tempo} BPM` : ''}`
+      : `Original tempo: ${orig} BPM, ${what}${on ? '' : ' (off: playing at your slider tempo)'}`;
+    b.title = tip;
+    b.setAttribute('aria-label', tip);
+    $('tempoGroup').classList.toggle('orig-on', on);
   }
   function openTempoInput() {
     $('tempoValue').hidden = true;
     const inp = $('tempo');
     inp.hidden = false;
-    inp.value = S.tempo;
+    inp.value = tempoNow();
     inp.focus();
     inp.select();
   }
@@ -1159,7 +1187,14 @@
       else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeTempoInput(false); }
     });
     inp.addEventListener('blur', () => closeTempoInput(true));
-    setTempo(S.tempo);
+    $('btnOrig').addEventListener('click', () => {
+      S.useOriginal = !S.useOriginal;
+      save();
+      if (run) stopRun(true);
+      showTempo();
+      setButtons();
+    });
+    showTempo();
   }
 
   // ---------- settings component ----------

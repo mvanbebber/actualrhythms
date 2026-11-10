@@ -75,8 +75,9 @@
               <button class="btn" id="btnListen" type="button"></button>
               <button class="btn" id="btnNext" type="button" title="Left arrow goes back to earlier rhythms"></button>
             </div>
-            <div class="tempo" role="group" aria-label="Tempo">
+            <div class="tempo" id="tempoGroup" role="group" aria-label="Tempo">
               <input type="range" id="tempoSlider" class="tempo-slider" min="40" max="200" step="2" aria-label="Tempo, beats per minute" aria-describedby="tempoBeat">
+              <button type="button" class="tempo-orig" id="btnOrig" aria-pressed="false">Original</button>
               <button type="button" class="tempo-value" id="tempoValue" aria-label="Type an exact tempo"><span id="tempoNum">80</span><span class="tempo-unit"> BPM</span></button>
               <input id="tempo" class="tempo-input" type="number" inputmode="numeric" min="40" max="200" step="2" aria-label="Type a tempo in beats per minute" hidden>
               <span class="tempo-beat" id="tempoBeat"></span>

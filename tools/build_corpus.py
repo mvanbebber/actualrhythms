@@ -250,6 +250,32 @@ def abc_source_years(path):
     return years
 
 
+def score_tempos(s):
+    """A function: offset (quarter lengths) -> the quarter-note BPM marked in force there, or None.
+    Only metronome marks with a written number count; a tempo word alone ('Allegro') gives nothing."""
+    from music21 import tempo
+    marks = []
+    for mm in s.recurse().getElementsByClass(tempo.MetronomeMark):
+        if mm.number is None or mm.numberImplicit:
+            continue
+        try:
+            q = mm.getQuarterBPM()
+            off = float(mm.getOffsetInHierarchy(s))
+        except Exception:
+            continue
+        if q and 20 <= q <= 500:
+            marks.append((off, q))
+    marks.sort()
+
+    def at(off):
+        cur = None
+        for o, q in marks:
+            if o <= off + 1e-6:
+                cur = q
+        return cur
+    return at
+
+
 def process_file(args):
     path, folder = args[0], args[1]
     meta = args[2] if len(args) > 2 else None
@@ -262,6 +288,7 @@ def process_file(args):
     fname = os.path.splitext(os.path.basename(path))[0]
     for s in scores:
         try:
+            tempo_at = score_tempos(s)
             title, composer = score_title(s, path, folder)
             if meta:
                 title, composer = meta['title'], meta['composer']
@@ -270,8 +297,11 @@ def process_file(args):
                      'origin_raw': clean_title(md.localeOfComposition, folder) if md is not None and md.localeOfComposition else None,
                      's_year': s_years.get(str(md.number)) if md is not None and md.number is not None else None}
             for part, pname in parts_of(s, folder):
+                bar_offsets = {m.number: float(m.offset) for m in part.getElementsByClass('Measure')}
                 for w in extract_part(part, pname, title, composer, folder):
                     w['src'].update(extra)
+                    off = bar_offsets.get(w['src']['bar'])
+                    w['tempo'] = tempo_at(off) if off is not None else None
                     results.append(w)
         except Exception:
             continue
@@ -468,7 +498,9 @@ def main():
                     clean.append(b)
                 except Skip:
                     clean.append(None)
-            found.extend(windows_from_bars(clean, src))
+            for w in windows_from_bars(clean, src):
+                w['tempo'] = src.get('tempo')
+                found.append(w)
         print(f'jazz: {len(found) - n0} windows from the Weimar Jazz Database', file=sys.stderr)
 
     # a triplet group must start on its own grid (a beat for triplet eighths, half a beat for triplet
@@ -527,6 +559,8 @@ def main():
             origin, date = origins.origin_and_date(s)
             sources.append([s['title'], s['composer'] or '', s['folder'], origin or '', date or '', s.get('note') or ''])
         occ = [src_index[skey], s['part'], s['bar'], [[e[3] for e in m] for m in w['measures']]]
+        if w.get('tempo'):
+            occ.append(int(round(w['tempo'])))  # quarter notes per minute: marked in the score, or the recording's average
         if key not in uniq:
             uniq[key] = {'m': w['meter'], 'b': w['bars'],
                          'r': [[e[:3] for e in m] for m in w['measures']],
@@ -550,7 +584,7 @@ def main():
                 u['n'] += other['n']
                 for o in other['o']:
                     if len(u['o']) < args.max_sources and all(o[0] != q[0] for q in u['o']):
-                        u['o'].append([o[0], o[1], o[2], [list(m) for m in o[3]]])  # a copy: encoded separately below
+                        u['o'].append([o[0], o[1], o[2], [list(m) for m in o[3]]] + o[4:])  # a copy: encoded separately below
 
     items = []
     for u in uniq.values():

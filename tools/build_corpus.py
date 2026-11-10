@@ -500,8 +500,10 @@ def main():
     sources = []
     src_index = {}
     for w in found:
-        key = (w['meter'], json.dumps([[e[:3] for e in m] for m in w['measures']]))
         s = w['src']
+        # Latin patterns stay their own entries (at their natural length); they're linked to matching
+        # excerpts below by where the notes fall
+        key = ('latin', s['title']) if w.get('fixed') else (w['meter'], json.dumps([[e[:3] for e in m] for m in w['measures']]))
         skey = (s['title'], s['composer'], s['folder'])
         if skey not in src_index:
             src_index[skey] = len(sources)
@@ -512,13 +514,26 @@ def main():
             uniq[key] = {'m': w['meter'], 'b': w['bars'],
                          'r': [[e[:3] for e in m] for m in w['measures']],
                          'n': 0, 'o': []}
+            if w.get('fixed'):
+                uniq[key]['f'] = 1  # natural length: shown whatever Length is set to
         u = uniq[key]
         u['n'] += 1
-        if s['folder'] == 'latin':
-            # a named Latin pattern always keeps its place (the Latin filter depends on it)
-            u['o'] = [occ] + [o for o in u['o'] if o[0] != occ[0]][:args.max_sources - 1]
-        elif len(u['o']) < args.max_sources and all(o[0] != occ[0] for o in u['o']):
+        if len(u['o']) < args.max_sources and all(o[0] != occ[0] for o in u['o']):
             u['o'].append(occ)
+
+    # 'Also found in' for Latin patterns: corpus excerpts whose attacks fall in the same places,
+    # however they're notated (a 1-bar pattern is compared with 2-bar excerpts, repeated)
+    by_onsets = {}
+    for k, u in uniq.items():
+        if not u.get('f') and u['b'] == 2:
+            by_onsets.setdefault(latin.onset_signature(u['m'], u['r']), []).append(u)
+    for k, u in uniq.items():
+        if u.get('f'):
+            for other in sorted(by_onsets.get(latin.onset_signature(u['m'], u['r']), []), key=lambda x: -x['n']):
+                u['n'] += other['n']
+                for o in other['o']:
+                    if len(u['o']) < args.max_sources and all(o[0] != q[0] for q in u['o']):
+                        u['o'].append([o[0], o[1], o[2], [list(m) for m in o[3]]])  # a copy: encoded separately below
 
     items = []
     for u in uniq.values():

@@ -17,7 +17,10 @@
   };
   const GENRES = { folk: 'Folk tunes', chorale: 'Bach chorales', classical: 'Classical', ragtime: 'Ragtime', jazz: 'Jazz solos', popular: 'Popular songs', latin: 'Latin rhythms' };
   const GRADE = { perfect: 0.035, good: 0.075 };
-  const REPEATS = 2; // every excerpt is played through twice (written with a repeat sign)
+  // every excerpt is played through more than once (written with a repeat sign): twice, or four
+  // times for a one-bar pattern so there's time to settle into it
+  const repeatsFor = (item) => (item && item.b === 1 ? 4 : 2);
+  const reps = () => repeatsFor(current && current.item);
   const WORSE = { perfect: 0, good: 1, off: 2, miss: 3 };
 
   // ---------- settings ----------
@@ -70,8 +73,9 @@
   function genreOf(occ) { return DATA.collections[DATA.sources[occ[0]][2]].genre; }
 
   function pool() {
-    return DATA.rhythms.filter((r) => r.b === S.bars && S.levels.includes(r.l) && S.meters.includes(r.m)
-      && r.o.some((o) => S.genres.includes(genreOf(o))));
+    // Latin patterns have a fixed, natural length (1 or 2 bars) and show whatever Length is set to
+    return DATA.rhythms.filter((r) => S.levels.includes(r.l) && S.meters.includes(r.m)
+      && (r.f ? S.genres.includes('latin') : r.b === S.bars && r.o.some((o) => S.genres.includes(genreOf(o)))));
   }
 
   // ---------- meter helpers ----------
@@ -173,6 +177,8 @@
   const LINE_Y = 52;
   const LANE_Y = 27;
   const LANE_GAP = 19;
+  // room under the staff for one feedback lane per time through
+  const rowHeight = () => ROW_H + (reps() - 2) * LANE_GAP;
   const INK = '#202622';
   const GRADE_COLOR = { perfect: '#1E7A4C', good: '#2563A8', off: '#B5600B', miss: '#B42318' };
   let lastRenderW = 0;
@@ -298,7 +304,8 @@
     // ...and beyond that, draw at the needed width and let the score box scroll sideways (never clip)
     let canvasW = W;
     if (widest * squeeze > Wl - 8) { canvasW = Math.ceil((widest * squeeze + 8) * s); Wl = canvasW / s; }
-    const H = plan.rows.length * ROW_H;
+    const rowH = rowHeight();
+    const H = plan.rows.length * rowH;
     const renderer = new VF.Renderer(host, VF.Renderer.Backends.SVG);
     renderer.resize(canvasW, Math.ceil(H * s));
     const ctx = renderer.getContext();
@@ -311,7 +318,7 @@
     const rowsInfo = [];
     const rowOfMeasure = [];
     plan.rows.forEach((idxs, r) => {
-      const rowTop = r * ROW_H;
+      const rowTop = r * rowH;
       const y = rowTop + LINE_Y - 40; // stave line sits 40px below the stave's y (4 spaces of headroom)
       const sum = idxs.reduce((acc, k) => acc + plan.min[k] * squeeze, 0);
       const spare = Math.max(0, Wl - 8 - sum);
@@ -708,8 +715,9 @@
     const t0 = start + countBeats * beatSec;
     for (let b = 0; b < countBeats; b++) click(start + b * beatSec, b === 0);
     const total = current.flat.total;
-    const nBeats = Math.round(total * REPEATS / mi.beat);
-    const passes = (fn) => { for (let p = 0; p < REPEATS; p++) soundingNotes().forEach((n) => fn(n, t0 + (n.pos + p * total) * spt)); };
+    const R = reps();
+    const nBeats = Math.round(total * R / mi.beat);
+    const passes = (fn) => { for (let p = 0; p < R; p++) soundingNotes().forEach((n) => fn(n, t0 + (n.pos + p * total) * spt)); };
     if (mode === 'play' && S.metro) for (let b = 0; b < nBeats; b++) click(t0 + b * beatSec, (b * mi.beat) % mi.bar === 0, true);
     if (mode === 'listen') {
       if (S.metro) for (let b = 0; b < nBeats; b++) click(t0 + b * beatSec, (b * mi.beat) % mi.bar === 0, true);
@@ -718,7 +726,7 @@
     if (mode === 'melody') {
       passes((n, t) => { if (n.midi) piano.play(t, n.len * spt, n.midi, velocityAt(n.pos, true)); });
     }
-    run = { mode, start, t0, spt, beatSec, countBeats, taps: [], endAt: t0 + total * REPEATS * spt + (mode === 'play' ? beatSec * 0.75 : 0.1) };
+    run = { mode, start, t0, spt, beatSec, countBeats, taps: [], endAt: t0 + total * R * spt + (mode === 'play' ? beatSec * 0.75 : 0.1) };
     phase = 'countin';
     if (mode === 'play' && lastResult) { lastResult = null; render(); renderOutcome(); }
     setButtons();
@@ -753,10 +761,11 @@
       phase = run.mode === 'play' ? 'playing' : 'listening';
       const total = current.flat.total;
       const tk = (now - run.t0) / run.spt;
-      const pass = Math.min(REPEATS - 1, Math.floor(tk / total));
-      if (run.mode === 'play') setPadStatus('playing', pass === 0 ? 'Tap each note · first time' : 'Tap each note · repeat');
+      const R = reps();
+      const pass = Math.min(R - 1, Math.floor(tk / total));
+      if (run.mode === 'play') setPadStatus('playing', R === 2 ? (pass === 0 ? 'Tap each note · first time' : 'Tap each note · repeat') : `Tap each note · ${pass + 1} of ${R}`);
       else setPadStatus('listening', 'Playing the melody · taps are not scored');
-      const p = tickToXY(tk >= total * REPEATS ? total : tk % total);
+      const p = tickToXY(tk >= total * R ? total : tk % total);
       if (p && layout) {
         ph.hidden = false;
         ph.style.left = (p.x * layout.s) + 'px';
@@ -814,7 +823,8 @@
     const evs = current.flat.events;
     const onsets = [];
     const total = current.flat.total;
-    for (let p = 0; p < REPEATS; p++) {
+    const R = reps();
+    for (let p = 0; p < R; p++) {
       evs.forEach((e, i) => {
         if (e.onset) { const tick = e.pos + p * total; onsets.push({ idx: i, pass: p, tick, t: r.t0 + tick * r.spt }); }
       });
@@ -852,7 +862,7 @@
     onsets.forEach((o) => { if (!byEvent[o.idx] || WORSE[o.grade] > WORSE[byEvent[o.idx].grade]) byEvent[o.idx] = o; });
     const tapTicks = taps.map((t, j) => {
       const tick = (t - r.t0) / r.spt;
-      const pass = j in tapPass ? tapPass[j] : Math.max(0, Math.min(REPEATS - 1, Math.floor(tick / total)));
+      const pass = j in tapPass ? tapPass[j] : Math.max(0, Math.min(R - 1, Math.floor(tick / total)));
       return { tick, pass, extra: !usedT.has(j), grade: j in tapOnset ? onsets[tapOnset[j]].grade : 'extra' };
     });
     lastResult = { onsets, byEvent, tapTicks, cnt, extra, pct, mean, sd };
@@ -920,7 +930,7 @@
         <span class="count" style="--c:var(--miss)">${R.cnt.miss} missed</span>
         <span class="count" style="--c:var(--miss)">${R.extra} extra tap${R.extra === 1 ? '' : 's'}</span>
       </div>
-      <p class="legend">Under the staff, gray marks show where each note falls (top row the first time through, bottom row the repeat). Dots are your taps: <span class="lg" style="--c:var(--perfect)">within 35 ms</span> <span class="lg" style="--c:var(--good)">within 75 ms</span> <span class="lg" style="--c:var(--off)">loose</span> <span class="lg" style="--c:var(--miss)">extra tap</span>. A mark with no dot is a missed note.</p>
+      <p class="legend">Under the staff, gray marks show where each note falls, one row for each time through. Dots are your taps: <span class="lg" style="--c:var(--perfect)">within 35 ms</span> <span class="lg" style="--c:var(--good)">within 75 ms</span> <span class="lg" style="--c:var(--off)">loose</span> <span class="lg" style="--c:var(--miss)">extra tap</span>. A mark with no dot is a missed note.</p>
     </div>`;
   }
 
@@ -1029,7 +1039,7 @@
   function renderMeta() {
     if (!current) { $('metaChips').innerHTML = ''; return; }
     const { item } = current;
-    $('metaChips').innerHTML = `<span class="chip">${item.m}</span><span class="chip" title="${LEVELS[item.l][0]}: ${esc(LEVELS[item.l][1])}">Level ${item.l}</span><span class="chip">${item.b} bars</span>`;
+    $('metaChips').innerHTML = `<span class="chip">${item.m}</span><span class="chip" title="${LEVELS[item.l][0]}: ${esc(LEVELS[item.l][1])}">Level ${item.l}</span><span class="chip">${item.b} bar${item.b > 1 ? 's' : ''}</span>`;
   }
 
   // ---------- tempo ----------
@@ -1290,7 +1300,7 @@
     const where = [src[3], src[4]].filter(Boolean).join(' · ');
     return `<div class="c-thumb">${thumbSVG(item, thumbW)}</div>
       <div class="c-meta">
-        <span class="c-chips"><span class="chip">${item.m}</span><span class="chip">Level ${item.l}</span><span class="chip">${item.b} bars</span>${item.n > 1 ? `<span class="c-n">occurs ${item.n}×</span>` : ''}</span>
+        <span class="c-chips"><span class="chip">${item.m}</span><span class="chip">Level ${item.l}</span><span class="chip">${item.b} bar${item.b > 1 ? 's' : ''}</span>${item.n > 1 ? `<span class="c-n">occurs ${item.n}×</span>` : ''}</span>
         <span class="c-src"><b>${esc(src[0])}</b>${src[1] ? ' · ' + esc(src[1]) : ''}${where ? ' · ' + esc(where) : ''}</span>
       </div>`;
   }

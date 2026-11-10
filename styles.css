@@ -141,14 +141,41 @@ kbd {
 .controls { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
 .transport { display: flex; gap: var(--s2); flex-wrap: wrap; }
 .tempo { display: flex; align-items: center; gap: var(--s2); }
-.tempo-read { display: inline-flex; align-items: baseline; gap: 4px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.tempo-read input {
-  width: 3.4ch; border: 0; border-bottom: 1px solid transparent; background: transparent; padding: 2px 0;
-  text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; -moz-appearance: textfield; appearance: textfield;
+.tempo-wheel {
+  --tw-item: 38px;
+  position: relative; width: 220px; height: var(--control-h); flex: none;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); overflow: hidden;
 }
-.tempo-read input::-webkit-outer-spin-button, .tempo-read input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-.tempo-read input:hover, .tempo-read input:focus { border-bottom-color: var(--border-strong); }
-.tempo-read span { font-weight: 600; font-size: 14px; }
+/* the centre slot */
+.tempo-wheel::after {
+  content: ""; position: absolute; top: 4px; bottom: 4px; left: calc(50% - var(--tw-item) / 2 - 2px); width: calc(var(--tw-item) + 4px);
+  border-radius: 6px; background: var(--teal-pale); pointer-events: none; z-index: 0;
+}
+.tw-scroll {
+  position: relative; z-index: 1; height: 100%;
+  display: flex; align-items: center; overflow-x: auto; overflow-y: hidden;
+  scroll-snap-type: x mandatory; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch;
+  padding-inline: calc(50% - var(--tw-item) / 2); scrollbar-width: none; touch-action: pan-x;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 22%, #000 78%, transparent);
+  cursor: grab;
+}
+.tw-scroll::-webkit-scrollbar { display: none; }
+.tw-scroll:focus-visible { outline: none; }
+.tempo-wheel:has(.tw-scroll:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
+.tw-item {
+  flex: none; width: var(--tw-item); scroll-snap-align: center; text-align: center; user-select: none; -webkit-user-select: none;
+  font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; line-height: 1;
+}
+.tw-item.major { color: var(--ink); font-weight: 600; }
+.tw-item.on { color: var(--teal); font-size: 18px; font-weight: 700; }
+.tw-input {
+  position: absolute; z-index: 2; top: 3px; bottom: 3px; left: calc(50% - 28px); width: 56px;
+  border: 2px solid var(--teal); border-radius: 6px; background: var(--surface); text-align: center;
+  font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; -moz-appearance: textfield; appearance: textfield; padding: 0;
+}
+.tw-input::-webkit-outer-spin-button, .tw-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.tempo-unit { font-weight: 600; font-size: 14px; }
 .tempo-beat { color: var(--muted); font-size: 12px; }
 .tempo-beat:empty { display: none; }
 
@@ -454,8 +481,8 @@ html[data-layout="medium"] .wordmark, html[data-layout="wide"] .wordmark { line-
 /* landscape phones: the transport + tempo strip must fit the left column */
 html[data-layout="phone-landscape"] .transport .btn { padding: 0 10px; gap: 6px; }
 html[data-layout="phone-landscape"] .tempo { gap: 4px; padding-left: var(--s2); }
-html[data-layout="phone-landscape"] .tempo-read span { display: none; }
-html[data-layout="phone-landscape"] .tempo-read input { width: 3ch; }
+html[data-layout="phone-landscape"] .tempo-unit { display: none; }
+html[data-layout="phone-landscape"] .tempo-wheel { width: 150px; --tw-item: 34px; }
 
 .legend .lg { white-space: nowrap; }
 .legend .lg::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--c); margin: 0 4px 0 2px; vertical-align: 0; }
@@ -507,3 +534,6 @@ html[data-layout="phone-landscape"] .tempo-read input { width: 3ch; }
 
 .calib-warn { margin: 0; font-size: 13px; color: var(--off); font-weight: 500; }
 .calib-warn:empty { display: none; }
+
+html[data-layout="phone"] .tempo-wheel { width: min(260px, 70vw); }
+@media (prefers-reduced-motion: reduce) { .tw-scroll { scroll-behavior: auto; } }

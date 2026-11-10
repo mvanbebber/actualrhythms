@@ -89,7 +89,7 @@ async function performTaps(p, { lateMs = 0, skipFirst = 0 } = {}) {
     }));
     check(info.layout === expect, `layout ${info.layout}, expected ${expect}`);
     check(info.sw <= info.cw, `horizontal overflow ${info.sw} > ${info.cw}`);
-    for (const sel of ['.sheet', '#btnPlay', '#btnListen', '#btnNext', '#tempoDown', '#tempoUp', '#pad']) {
+    for (const sel of ['.sheet', '#btnPlay', '#btnListen', '#btnNext', '.tempo-wheel', '#pad']) {
       const b = await box(p, sel);
       check(b.x >= 0 && b.x + b.w <= w + 0.5, `${sel} clipped horizontally (${Math.round(b.x)}..${Math.round(b.x + b.w)})`);
       if (touch && sel.startsWith('#') && sel !== '#pad') check(b.h >= 44 && b.w >= 44, `${sel} touch target ${Math.round(b.w)}x${Math.round(b.h)}`);
@@ -100,7 +100,7 @@ async function performTaps(p, { lateMs = 0, skipFirst = 0 } = {}) {
       check(pad.x > sheet.x + sheet.w, 'landscape: pad is not to the right of the score');
       check(pad.y + Math.min(pad.h, 160) <= h && ctl.y + ctl.h <= h, 'landscape: controls or pad below the fold');
       check(await p.$eval('.pad-label .short', (e) => getComputedStyle(e).display !== 'none'), 'landscape pad label should read "Tap"');
-      const up = await box(p, '#tempoUp');
+      const up = await box(p, '.tempo-wheel');
       check(up.x + up.w <= pad.x - 4, `landscape: tempo controls run under the Tap pad (${Math.round(up.x + up.w)} > ${Math.round(pad.x)})`);
     } else check(await p.$eval('.pad-label .long', (e) => getComputedStyle(e).display !== 'none'), 'pad label should read "Tap the rhythm"');
     const svgW = await p.$eval('#score svg', (s) => s.getBoundingClientRect().width);
@@ -259,10 +259,24 @@ async function performTaps(p, { lateMs = 0, skipFirst = 0 } = {}) {
     await p.keyboard.press('ArrowRight'); const b = await p.evaluate(() => window.actualRhythms.current.item.r.join('|'));
     await p.keyboard.press('ArrowLeft'); const a2 = await p.evaluate(() => window.actualRhythms.current.item.r.join('|'));
     check(a !== b && a === a2, 'arrow keys do not step forward and back');
-    await p.click('#tempoUp'); await p.click('#tempoUp');
-    check(await p.inputValue('#tempo') === '124', 'tempo stepper');
-    await p.fill('#tempo', '73'); await p.press('#tempo', 'Enter'); await p.click('.wordmark');
-    check(await p.inputValue('#tempo') === '74', 'typed tempo should round to the 2-BPM grid');
+    // tempo wheel: arrows step, the centre opens typing, numbers jump, the mouse wheel spins it
+    const tempoNow = () => p.evaluate(() => JSON.parse(localStorage.getItem('rr.settings')).tempo);
+    await p.focus('#tempoWheel');
+    const ex0 = await p.evaluate(() => window.actualRhythms.current.item.r.join('|'));
+    await p.keyboard.press('ArrowRight'); await p.keyboard.press('ArrowRight');
+    check(await tempoNow() === 124, 'arrow keys on the wheel step the tempo');
+    check(await p.evaluate(() => window.actualRhythms.current.item.r.join('|')) === ex0, 'arrows on the wheel must not change the rhythm');
+    await p.click('#tempoWheel .tw-item.on');
+    check(await p.isVisible('#tempo'), 'tapping the centre number should open typing');
+    await p.fill('#tempo', '73'); await p.press('#tempo', 'Enter');
+    check(await tempoNow() === 74 && await p.isHidden('#tempo'), 'typed tempo should round to the 2-BPM grid and close');
+    await p.click('#tempoWheel .tw-item[data-v="80"]', { force: true });
+    await p.waitForTimeout(600);
+    check(await tempoNow() === 80, 'clicking a visible number jumps to it');
+    await p.hover('#tempoWheel');
+    await p.mouse.wheel(0, 380); await p.waitForTimeout(500);
+    check(await tempoNow() > 80, 'the mouse wheel should spin the tempo up');
+    await p.keyboard.press('Escape');
     check(await p.isVisible('#outcome .source h3'), 'source should be visible by default');
     await p.click('#advanced summary');
     await p.click('#hideSource');
@@ -348,7 +362,7 @@ async function performTaps(p, { lateMs = 0, skipFirst = 0 } = {}) {
         check(b.y >= 0 && b.y + Math.min(b.h, 200) <= vh + 1, `${sel} not on screen (top ${Math.round(b.y)}, height ${Math.round(b.h)}, viewport ${vh})`);
       }
       if (dev.includes('iPhone') && dev.includes('landscape')) {
-        const up = await box(p, '#tempoUp'); const pd = await box(p, '#pad');
+        const up = await box(p, '.tempo-wheel'); const pd = await box(p, '#pad');
         check(up.x + up.w <= pd.x - 4, `tempo controls run under the Tap pad (${Math.round(up.x + up.w)} > ${Math.round(pd.x)})`);
       }
       const out = await box(p, '#outcome');

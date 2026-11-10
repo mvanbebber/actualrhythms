@@ -23,7 +23,7 @@
   // touch devices (phones, iPads, including iPads with a keyboard or trackpad) get the locked, no-scroll page
   if (navigator.maxTouchPoints > 0 || 'ontouchstart' in window) document.documentElement.dataset.touch = '';
 </script>
-<link rel="stylesheet" href="styles.css?v=18">
+<link rel="stylesheet" href="styles.css?v=26">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
@@ -76,12 +76,12 @@
               <button class="btn" id="btnNext" type="button" title="Left arrow goes back to earlier rhythms"></button>
             </div>
             <div class="tempo" role="group" aria-label="Tempo">
-              <button class="btn btn-icon" id="tempoDown" type="button" aria-label="Slower"><svg class="icon" aria-hidden="true"><use href="#i-minus"/></svg></button>
-              <label class="tempo-read">
-                <input id="tempo" type="number" inputmode="numeric" min="40" max="200" step="2" aria-describedby="tempoBeat">
-                <span>BPM</span>
-              </label>
-              <button class="btn btn-icon" id="tempoUp" type="button" aria-label="Faster"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg></button>
+              <div class="tempo-wheel">
+                <div class="tw-scroll" id="tempoWheel" tabindex="0" role="slider" aria-label="Tempo, beats per minute. Flick or scroll to change; press Enter to type a tempo"
+                     aria-valuemin="40" aria-valuemax="200" aria-describedby="tempoBeat"></div>
+                <input id="tempo" class="tw-input" type="number" inputmode="numeric" min="40" max="200" step="2" aria-label="Type a tempo in beats per minute" hidden>
+              </div>
+              <span class="tempo-unit">BPM</span>
               <span class="tempo-beat" id="tempoBeat"></span>
             </div>
           </div>
@@ -225,6 +225,6 @@
 
 <script src="vendor/vexflow.js"></script>
 <script src="data/rhythms.js?v=212f6c041c"></script>
-<script src="app.js?v=25"></script>
+<script src="app.js?v=26"></script>
 </body>
 </html>

@@ -982,7 +982,11 @@
       return `<li>${esc(src[0])}${src[1] ? ' (' + esc(src[1]) + ')' : ''}${place ? ', ' + esc(place) : ''}${src[4] ? ', ' + esc(src[4].replace(/^(composed|published|recorded|harmonized) /, '')) : ''}</li>`;
     }).join('');
     const extra = item.n - item.o.length;
-    const more = extra > 0 ? `<p>Plus ${extra} more occurrence${extra > 1 ? 's' : ''} across the corpus.</p>` : '';
+    const alt = otherSpellings(item);
+    const altMeters = [...new Set(alt.others.map((r) => r.m))].join(', ');
+    const seeAll = (text) => `<button type="button" class="link-btn inline" data-action="family">${text}</button>`;
+    const more = extra > 0 ? `<p>${seeAll(`Plus ${extra} more occurrence${extra > 1 ? 's' : ''} across the corpus`)}</p>` : '';
+    const altLine = alt.n ? `<p>${seeAll(`Also written another way ${alt.n} time${alt.n > 1 ? 's' : ''} (${esc(altMeters)}), with the same proportions`)}</p>` : '';
     const q = occ[4];
     const tempoLine = q ? `<p>Tempo: ${originalTempo()} BPM${current.mi.compound ? ` (dotted-${current.mi.den === 8 ? 'quarter' : 'half'} beat)` : ''}, ${
       folder === 'wjd' ? 'the average tempo of the recording' : 'from the metronome mark in the score'}.</p>` : '';
@@ -992,8 +996,8 @@
       <h3>${esc(title)}${composer ? ` <em>${esc(composer)}</em>` : ''}</h3>
       ${where ? `<p class="where">${where}</p>` : ''}
       <p>${[part.replace(/, $/, ''), bars].filter(Boolean).join(', ')}${from}${note ? ` · ${esc(note)}` : ''}</p>
-      ${tempoLine}<p>${occurs}</p>
-      ${others ? `<div class="eyebrow">Also found in</div><ul>${others}</ul>` : ''}${more}
+      ${tempoLine}<p>${item.n > 1 || alt.n ? seeAll(occurs) : occurs}</p>
+      ${others ? `<div class="eyebrow">Also found in</div><ul>${others}</ul>` : ''}${more}${altLine}
       <button type="button" class="link-btn" data-action="corpus">Browse every rhythm in the corpus</button>
     </div>`;
   }
@@ -1466,12 +1470,53 @@
       </div>`;
   }
 
+  function familyRowHTML({ item, occ }) {
+    const src = DATA.sources[occ[0]];
+    const where = [src[3], src[4]].filter(Boolean).join(' · ');
+    const bars = occ[2] != null ? `mm. ${occ[2]}–${occ[2] + item.b - 1}` : '';
+    const same = item === corpusFamily;
+    return `<div class="c-thumb">${thumbSVG(item, thumbW)}</div>
+      <div class="c-meta">
+        <span class="c-chips"><span class="chip">${item.m}</span><span class="chip">Level ${item.l}</span><span class="chip">${item.b} bar${item.b > 1 ? 's' : ''}</span><span class="c-n">${same ? 'as shown' : 'written another way'}</span></span>
+        <span class="c-src"><b>${esc(src[0])}</b>${src[1] ? ' · ' + esc(src[1]) : ''}${where ? ' · ' + esc(where) : ''}${bars ? ' · ' + bars : ''}</span>
+      </div>`;
+  }
+
   function measureCorpus() {
     const sc = $('corpusScroll');
     const wide = sc.clientWidth >= 640;
     $('corpus').classList.toggle('wide-rows', wide);
     const w = Math.max(200, Math.floor(wide ? (sc.clientWidth - 32 - 16) * 0.56 : sc.clientWidth - 32));
     if (w !== thumbW) { thumbW = w; rowEls.forEach((el) => el.remove()); rowEls.clear(); }
+  }
+
+  function refreshFamily() {
+    const item = corpusFamily;
+    const q = $('corpusSearch').value.trim().toLowerCase();
+    let rows = familyRows(item);
+    const total = rows.length;
+    if (q) {
+      const terms = q.split(/\s+/);
+      rows = rows.filter((r) => {
+        const src = DATA.sources[r.occ[0]];
+        const hay = [src[0], src[1], src[3], src[4], src[5], DATA.collections[src[2]].label, r.occ[1], r.item.m].join(' ').toLowerCase();
+        return terms.every((t) => hay.includes(t));
+      });
+    }
+    corpusList = rows;
+    const songs = new Set(rows.map((r) => r.occ[0])).size;
+    const spellings = familyOf(item).length;
+    $('corpusFamilyBar').hidden = false;
+    $('corpusFamilyText').textContent = `Every occurrence of this rhythm: ${total.toLocaleString()} passage${total === 1 ? '' : 's'}`
+      + (spellings > 1 ? `, written ${spellings} ways with the same proportions` : '');
+    $('corpusCount').textContent = `${rows.length.toLocaleString()} passage${rows.length === 1 ? '' : 's'} from ${songs.toLocaleString()} piece${songs === 1 ? '' : 's'}`
+      + (q ? ` for “${$('corpusSearch').value.trim()}”` : '');
+    $('corpusSpacer').style.height = (rows.length * CORPUS_ROW) + 'px';
+    $('corpusSpacer').querySelectorAll('.c-empty').forEach((e) => e.remove());
+    if (!rows.length) $('corpusSpacer').insertAdjacentHTML('beforeend', '<p class="c-empty">No passages match that search.</p>');
+    rowEls.forEach((el) => el.remove()); rowEls.clear();
+    $('corpusScroll').scrollTop = 0;
+    renderCorpusRows();
   }
 
   function renderCorpusRows() {
@@ -1485,7 +1530,7 @@
       const el = document.createElement('button');
       el.type = 'button'; el.className = 'c-row'; el.dataset.i = i;
       el.style.top = (i * CORPUS_ROW) + 'px';
-      el.innerHTML = corpusRowHTML(corpusList[i]);
+      el.innerHTML = corpusFamily ? familyRowHTML(corpusList[i]) : corpusRowHTML(corpusList[i]);
       el.setAttribute('aria-label', `Practise: ${el.textContent.replace(/\s+/g, ' ').trim()}`);
       $('corpusSpacer').appendChild(el);
       rowEls.set(i, el);
@@ -1493,6 +1538,9 @@
   }
 
   function refreshCorpus() {
+    $('corpus').classList.toggle('family-mode', !!corpusFamily);
+    if (corpusFamily) return refreshFamily();
+    $('corpusFamilyBar').hidden = true;
     const q = $('corpusSearch').value.trim().toLowerCase();
     const only = $('corpusOnly').getAttribute('aria-checked') === 'true';
     let list = only ? pool() : DATA.rhythms.slice();
@@ -1519,6 +1567,60 @@
     renderCorpusRows();
   }
 
+  // ---------- every occurrence of a rhythm, and the same rhythm written other ways ----------
+  // rhythms.js keeps a few sources per rhythm; data/occurrences.js (loaded on request) has the rest.
+  let families = null;
+  function familyOf(item) {
+    if (item.g == null) return [item];
+    if (!families) {
+      families = new Map();
+      DATA.rhythms.forEach((r) => { if (r.g != null) { if (!families.has(r.g)) families.set(r.g, []); families.get(r.g).push(r); } });
+    }
+    return families.get(item.g);
+  }
+  // other ways this rhythm is written, and how often they occur
+  function otherSpellings(item) {
+    const others = familyOf(item).filter((r) => r !== item);
+    return { others, n: others.reduce((a, r) => a + r.n, 0) };
+  }
+  let occPromise = null;
+  function loadOccurrences() {
+    if (window.RHYTHM_OCC) return Promise.resolve(window.RHYTHM_OCC);
+    if (!occPromise) {
+      occPromise = new Promise((res, rej) => {
+        const sc = document.createElement('script');
+        sc.src = DATA.occurrences || 'data/occurrences.js';
+        sc.onload = () => (window.RHYTHM_OCC ? res(window.RHYTHM_OCC) : rej(new Error('no data')));
+        sc.onerror = () => { occPromise = null; sc.remove(); rej(new Error('load failed')); };
+        document.head.appendChild(sc);
+      });
+    }
+    return occPromise;
+  }
+  const rhythmIndex = new Map(DATA.rhythms.map((r, i) => [r, i]));
+  // all occurrences of one rhythm, in rhythms.js's format [source, part, bar, pitches, tempo?]
+  function allOccurrences(item) {
+    const O = window.RHYTHM_OCC;
+    const extra = O ? (O.o[rhythmIndex.get(item)] || []).map((o) => [o[0], O.parts[o[1]], o[2], o[3]].concat(o.slice(4))) : [];
+    return item.o.concat(extra);
+  }
+
+  // the corpus browser showing one rhythm family: a row for every passage, the asked-for spelling first
+  let corpusFamily = null;
+  async function openFamily(item) {
+    const opener = document.activeElement;
+    try { await loadOccurrences(); } catch (e) { /* show the sources we have */ }
+    corpusFamily = item;
+    openCorpus(false);
+    corpusOpener = opener;
+  }
+  function familyRows(item) {
+    const fam = familyOf(item).slice().sort((a, b) => (a === item ? -1 : b === item ? 1 : b.n - a.n));
+    const rows = [];
+    fam.forEach((it) => allOccurrences(it).forEach((occ) => rows.push({ item: it, occ })));
+    return rows;
+  }
+
   function openCorpus(onlyMatching) {
     if (corpusOpen) return;
     corpusOpener = document.activeElement;
@@ -1535,15 +1637,16 @@
   function closeCorpus() {
     if (!corpusOpen) return;
     corpusOpen = false;
+    corpusFamily = null;
     $('corpus').hidden = true;
     document.querySelector('.app').inert = false;
     rowEls.forEach((el) => el.remove()); rowEls.clear();
     const back = corpusOpener && corpusOpener.isConnected && corpusOpener.getClientRects().length ? corpusOpener : $('btnPlay');
     back.focus({ preventScroll: true });
   }
-  function practiseItem(item) {
+  function practiseItem(item, chosen) {
     const occs = item.o.filter((o) => S.genres.includes(genreOf(o)));
-    const occ = (occs.length ? occs : item.o)[0];
+    const occ = chosen || (occs.length ? occs : item.o)[0];
     if (run) stopRun(true);
     seen.splice(seenPos + 1);
     seen.push({ item, occ }); if (seen.length > 200) seen.shift();
@@ -1560,15 +1663,16 @@
       refreshCorpus();
     });
     $('corpusClose').addEventListener('click', closeCorpus);
+    $('corpusWhole').addEventListener('click', () => { corpusFamily = null; $('corpusSearch').value = ''; refreshCorpus(); $('corpusSearch').focus(); });
     $('corpus').addEventListener('click', (e) => { if (e.target === $('corpus')) closeCorpus(); }); // backdrop
     let raf = 0;
     $('corpusScroll').addEventListener('scroll', () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(renderCorpusRows); }, { passive: true });
     $('corpusSpacer').addEventListener('click', (e) => {
       const row = e.target.closest('.c-row');
       if (!row) return;
-      const item = corpusList[Number(row.dataset.i)];
+      const entry = corpusList[Number(row.dataset.i)];
       closeCorpus();
-      practiseItem(item);
+      if (entry.item) practiseItem(entry.item, entry.occ); else practiseItem(entry);
       setButtons();
     });
     window.addEventListener('resize', () => { if (corpusOpen) { measureCorpus(); renderCorpusRows(); } });
@@ -1595,6 +1699,7 @@
       if (a.dataset.action === 'melody') startRun('melody');
       if (a.dataset.action === 'settings') openSettings();
       if (a.dataset.action === 'corpus') openCorpus(false);
+      if (a.dataset.action === 'family' && current) openFamily(current.item);
     });
     document.addEventListener('keydown', (e) => {
       const tapKey = e.code === 'Space' || e.code === 'KeyF' || e.code === 'KeyJ';

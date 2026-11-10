@@ -569,6 +569,7 @@ def main():
                 uniq[key]['f'] = 1  # natural length: shown whatever Length is set to
         u = uniq[key]
         u['n'] += 1
+        u.setdefault('all', []).append(occ)  # every occurrence, for the lazily loaded data/occurrences.js
         if len(u['o']) < args.max_sources and all(o[0] != occ[0] for o in u['o']):
             u['o'].append(occ)
 
@@ -582,6 +583,7 @@ def main():
         if u.get('f'):
             for other in sorted(by_onsets.get(latin.onset_signature(u['m'], u['r']), []), key=lambda x: -x['n']):
                 u['n'] += other['n']
+                u['all'] = u.get('all', []) + other['all']
                 for o in other['o']:
                     if len(u['o']) < args.max_sources and all(o[0] != q[0] for q in u['o']):
                         u['o'].append([o[0], o[1], o[2], [list(m) for m in o[3]]] + o[4:])  # a copy: encoded separately below
@@ -591,6 +593,58 @@ def main():
         u['l'] = difficulty(u['m'], u['r'])
         items.append(u)
     items.sort(key=lambda u: (u['b'], u['l'], u['m'], -u['n']))
+
+    # Rhythm families: the same rhythm in proportion, however it's written (2/4 '8 8 q' is 2/2 'q q h';
+    # four bars of 2/4 can be two of 4/4). Key: where each attack and each rest starts, as a fraction
+    # of the whole excerpt, ties merged. A 1-bar Latin pattern is compared as two bars, repeated.
+    def prop_key(u):
+        ms = u['r'] * (2 if u.get('f') and u['b'] == 1 else 1)
+        flat = [e for m in ms for e in m]
+        total = sum(e[0] for e in flat)
+        marks, pos, prev_rest = [], 0, False
+        for i, e in enumerate(flat):
+            rest = bool(e[2] & FLAG_REST)
+            tied_in = i and flat[i - 1][2] & FLAG_TIE and not rest
+            if rest and not prev_rest:
+                marks.append(('r', Fraction(pos, total)))
+            elif not rest and not tied_in:
+                marks.append(('a', Fraction(pos, total)))
+            prev_rest = rest
+            pos += e[0]
+        return tuple(marks)
+    fam = {}
+    for i, u in enumerate(items):
+        fam.setdefault(prop_key(u), []).append(i)
+    n_fam = 0
+    for idxs in fam.values():
+        if len(idxs) > 1:
+            for i in idxs:
+                items[i]['g'] = n_fam
+            n_fam += 1
+    print(f'{n_fam} rhythm families group {sum(len(v) for v in fam.values() if len(v) > 1)} rhythms written more than one way', file=sys.stderr)
+
+    # every occurrence beyond the few kept in rhythms.js, loaded only when someone asks to see them all
+    part_ix, parts = {}, []
+    def pidx(name):
+        name = name or ''
+        if name not in part_ix:
+            part_ix[name] = len(parts); parts.append(name)
+        return part_ix[name]
+    from collections import Counter
+    extra = []
+    for u in items:
+        kept = Counter((o[0], o[1], o[2]) for o in u['o'])  # each kept occurrence is skipped once
+        rows = []
+        for o in u.pop('all', []):
+            k = (o[0], o[1], o[2])
+            if kept[k]:
+                kept[k] -= 1
+                continue
+            row = [o[0], pidx(o[1]), o[2], [''.join(f'{p:02x}' for p in m) for m in o[3]]]
+            if len(o) > 4:
+                row.append(o[4])
+            rows.append(row)
+        extra.append(rows)
     # compact encoding: one string per measure, space-separated tokens
     # code + markers: r rest, ~ tied to next, t triplet, [ bracket start, ] bracket stop
     def enc_ev(e):
@@ -601,8 +655,19 @@ def main():
         u['r'] = [' '.join(enc_ev(e) for e in m) for m in u['r']]
         for o in u['o']:  # pitches as 2-digit hex MIDI numbers, one string per measure
             o[3] = [''.join(f'{p:02x}' for p in m) for m in o[3]]
+    occ_path = os.path.join(os.path.dirname(os.path.abspath(args.out)), 'occurrences.js')
+    with open(occ_path, 'w') as f:
+        f.write('window.RHYTHM_OCC=')
+        json.dump({'parts': parts, 'o': extra}, f, separators=(',', ':'), ensure_ascii=False)
+        f.write(';\n')
+    print(f'wrote {occ_path} ({os.path.getsize(occ_path)/1e6:.1f} MB)', file=sys.stderr)
+
+    import hashlib
+    with open(occ_path, 'rb') as fh:
+        occ_url = 'data/occurrences.js?v=' + hashlib.sha1(fh.read()).hexdigest()[:10]
     data = {
         'version': 3, 'tpq': TPQ,
+        'occurrences': occ_url,
         'collections': {k: {'label': v[0], 'genre': v[1]} for k, v in COLLECTIONS.items()},
         'sources': sources,
         'rhythms': items,

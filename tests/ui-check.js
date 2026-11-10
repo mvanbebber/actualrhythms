@@ -359,6 +359,35 @@ async function performTaps(p, { lateMs = 0, skipFirst = 0 } = {}) {
       check(await p.isHidden('#corpus'), 'Escape should close the corpus');
       check(await p.evaluate(() => document.activeElement.id) === 'poolNote', 'focus should return to what opened the corpus');
     }
+    // every occurrence of one rhythm, including the same proportions written another way
+    {
+      const fam = await p.evaluate(() => {
+        const R = window.RHYTHM_DATA.rhythms;
+        const i = R.findIndex((r) => r.g != null && r.n > r.o.length && R.some((x) => x !== r && x.g === r.g && x.m !== r.m));
+        const sum = R.filter((x) => x.g === R[i].g).reduce((a, x) => a + x.n, 0);
+        return { i, sum, meters: [...new Set(R.filter((x) => x.g === R[i].g).map((x) => x.m))] };
+      });
+      await p.evaluate((i) => window.actualRhythms.show(i), fam.i);
+      check(await p.isVisible('#outcome .source [data-action="family"] >> nth=0'), 'source card should link to every occurrence');
+      await p.click('#outcome .source [data-action="family"] >> nth=0');
+      await p.waitForSelector('#corpus:not([hidden]) .c-row');
+      const txt = await p.textContent('#corpusFamilyText');
+      check(txt.includes(`${fam.sum.toLocaleString('en-US')} passage`), `family view should list all ${fam.sum} passages: "${txt}"`);
+      check((await p.$$('.c-row')).length > 0, 'family view should render rows');
+      await p.click('#corpusWhole');
+      check((await p.textContent('#corpusCount')).includes('rhythms in the corpus'), 'Show the whole corpus should leave the family view');
+      await p.keyboard.press('Escape');
+      // a passage only in the full list (not in rhythms.js) can be practised
+      await p.click('#outcome .source [data-action="family"] >> nth=0');
+      await p.waitForSelector('#corpus:not([hidden]) .c-row');
+      await p.$eval('#corpusScroll', (e) => { e.scrollTop = e.scrollHeight; });
+      await p.waitForTimeout(200);
+      const rowsNow = await p.$$('.c-row');
+      await rowsNow[rowsNow.length - 1].click();
+      await p.waitForTimeout(300);
+      check(await p.isHidden('#corpus') && await p.isVisible('#outcome .source h3'), 'choosing a passage from the family view should load it');
+      console.log(`  family of ${fam.sum} passages in ${fam.meters.join(', ')}`);
+    }
     // the source card has its own link to the whole corpus
     await p.click('#outcome .source [data-action="corpus"]');
     await p.waitForSelector('#corpus:not([hidden]) .c-row');

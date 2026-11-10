@@ -28,7 +28,7 @@
   // touch devices (phones, iPads, including iPads with a keyboard or trackpad) get the locked, no-scroll page
   if (navigator.maxTouchPoints > 0 || 'ontouchstart' in window) document.documentElement.dataset.touch = '';
 </script>
-<link rel="stylesheet" href="styles.css?v=33">
+<link rel="stylesheet" href="styles.css?v=34">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
@@ -216,13 +216,17 @@
         <button class="switch" id="corpusOnly" type="button" role="switch" aria-checked="false" aria-labelledby="corpusOnlyLabel"></button>
       </div>
     </div>
+    <div class="corpus-family" id="corpusFamilyBar" hidden>
+      <p id="corpusFamilyText"></p>
+      <button type="button" class="link-btn" id="corpusWhole">Show the whole corpus</button>
+    </div>
     <p class="corpus-count" id="corpusCount" aria-live="polite"></p>
     <div class="corpus-scroll" id="corpusScroll"><div class="corpus-spacer" id="corpusSpacer"></div></div>
   </div>
 </div>
 
 <script src="vendor/vexflow.js"></script>
-<script src="data/rhythms.js?v=fcfac5ae62"></script>
-<script src="app.js?v=31"></script>
+<script src="data/rhythms.js?v=f94348999e"></script>
+<script src="app.js?v=32"></script>
 </body>
 </html>

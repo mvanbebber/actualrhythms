@@ -216,6 +216,7 @@ kbd {
   color: var(--teal); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
   text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px;
 }
+.source .link-btn.inline { justify-self: stretch; margin: 0; padding: 0; text-align: left; font-weight: 500; }
 .source .link-btn:hover { text-decoration-color: currentColor; }
 .source .actions { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s1); }
 .locked { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
@@ -512,6 +513,10 @@ html[data-layout="phone-landscape"] .tempo-value, html[data-layout="phone-landsc
 }
 .corpus-tools input { flex: 1 1 220px; min-width: 0; }
 .corpus-only { gap: var(--s2); font-size: 14px; }
+.corpus-family { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px var(--s3); margin: 0 var(--s4) var(--s2); padding: var(--s2) var(--s3); background: var(--teal-pale); border-radius: var(--radius-sm); }
+.corpus-family p { margin: 0; font-size: 14px; color: var(--ink); flex: 1 1 240px; min-width: 0; }
+.corpus-family .link-btn { padding: 0; border: 0; background: none; color: var(--teal); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.corpus.family-mode #corpusSort, .corpus.family-mode .corpus-only { display: none; }
 .corpus-count { margin: 0; padding: 0 var(--s4) var(--s2); font-size: 13px; color: var(--muted); }
 .corpus-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; border-top: 1px solid var(--border); }
 .corpus-spacer { position: relative; }

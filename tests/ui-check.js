@@ -352,6 +352,12 @@ async function performTaps(p, { lateMs = 0, skipFirst = 0 } = {}) {
       check(await p.isHidden('#corpus'), 'Escape should close the corpus');
       check(await p.evaluate(() => document.activeElement.id) === 'poolNote', 'focus should return to what opened the corpus');
     }
+    // the source card has its own link to the whole corpus
+    await p.click('#outcome .source [data-action="corpus"]');
+    await p.waitForSelector('#corpus:not([hidden]) .c-row');
+    check((await p.textContent('#corpusCount')).includes('rhythms in the corpus'), 'the source card link should open the whole corpus');
+    await p.keyboard.press('Escape');
+    check(await p.isHidden('#corpus'), 'Escape should close the corpus (source card link)');
     check(p.errors.length === 0, 'page errors: ' + p.errors.join(' | '));
     await p.context().close();
   }

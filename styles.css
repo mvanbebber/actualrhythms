@@ -211,6 +211,12 @@ kbd {
 .source h3 em { color: var(--muted); font-size: 16px; }
 .source p { margin: 0; color: var(--muted); font-size: 14px; }
 .source ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14px; }
+.source .link-btn {
+  justify-self: start; margin-top: var(--s1); padding: 6px 0; border: 0; background: none;
+  color: var(--teal); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+  text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px;
+}
+.source .link-btn:hover { text-decoration-color: currentColor; }
 .source .actions { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s1); }
 .locked { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
 .locked > summary {

@@ -994,6 +994,7 @@
       <p>${[part.replace(/, $/, ''), bars].filter(Boolean).join(', ')}${from}${note ? ` · ${esc(note)}` : ''}</p>
       ${tempoLine}<p>${occurs}</p>
       ${others ? `<div class="eyebrow">Also found in</div><ul>${others}</ul>` : ''}${more}
+      <button type="button" class="link-btn" data-action="corpus">Browse every rhythm in the corpus</button>
     </div>`;
   }
 
@@ -1593,6 +1594,7 @@
       if (!a) return;
       if (a.dataset.action === 'melody') startRun('melody');
       if (a.dataset.action === 'settings') openSettings();
+      if (a.dataset.action === 'corpus') openCorpus(false);
     });
     document.addEventListener('keydown', (e) => {
       const tapKey = e.code === 'Space' || e.code === 'KeyF' || e.code === 'KeyJ';

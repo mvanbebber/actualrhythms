@@ -1,0 +1,172 @@
+{
+  "joplin": {
+    "title": "Maple Leaf Rag",
+    "composer": "Scott Joplin",
+    "origin": "USA",
+    "date": "published 1899",
+    "coll": "Scott Joplin's rags (Sapp edition)",
+    "part": "Piano",
+    "bar": 28,
+    "meter": "2/4",
+    "bars": 2,
+    "level": 4,
+    "n": 1,
+    "r": [
+      "16r 16 16 16 16 8 16",
+      "8 8 8 8"
+    ]
+  },
+  "parker": {
+    "title": "Ko-Ko",
+    "composer": "Charlie Parker",
+    "origin": "",
+    "date": "recorded 1945",
+    "coll": "Weimar Jazz Database",
+    "part": "Alto sax solo",
+    "bar": 72,
+    "meter": "4/4",
+    "bars": 2,
+    "level": 2,
+    "n": 5,
+    "r": [
+      "8 8 8 8 8 8 8 8",
+      "8 8 8 8 hr"
+    ]
+  },
+  "rollins": {
+    "title": "The Everywhere Calypso, solo 2",
+    "composer": "Sonny Rollins",
+    "origin": "",
+    "date": "recorded 1972",
+    "coll": "Weimar Jazz Database",
+    "part": "Tenor sax solo",
+    "bar": 31,
+    "meter": "4/4",
+    "bars": 2,
+    "level": 4,
+    "n": 2,
+    "r": [
+      "8 8 8 8 8 8 8 16 16",
+      "8 8 8 8 8 8 8 8"
+    ]
+  },
+  "coltrane": {
+    "title": "Mr. P.C.",
+    "composer": "John Coltrane",
+    "origin": "",
+    "date": "recorded 1959",
+    "coll": "Weimar Jazz Database",
+    "part": "Tenor sax solo",
+    "bar": 49,
+    "meter": "4/4",
+    "bars": 2,
+    "level": 5,
+    "n": 3,
+    "r": [
+      "8 8 8 8 qt[ 8t] 8 8",
+      "8 8 8 8 qt[ 8t] 8 8"
+    ]
+  },
+  "armstrong": {
+    "title": "Got No Blues",
+    "composer": "Louis Armstrong",
+    "origin": "",
+    "date": "recorded 1927",
+    "coll": "Weimar Jazz Database",
+    "part": "Cornet solo",
+    "bar": 33,
+    "meter": "4/4",
+    "bars": 2,
+    "level": 4,
+    "n": 1,
+    "r": [
+      "q 8 8 8 8 q",
+      "16 8 16r 8 8 8d 16 8 8"
+    ]
+  },
+  "bach": {
+    "title": "Chorale BWV 108.6",
+    "composer": "J. S. Bach",
+    "origin": "Germany",
+    "date": "harmonized c. 1714–1750",
+    "coll": "J. S. Bach chorales",
+    "part": "Bass",
+    "bar": 5,
+    "meter": "4/4",
+    "bars": 2,
+    "level": 2,
+    "n": 163,
+    "r": [
+      "8 8 8 8 8 8 8 8",
+      "8 8 8 8 8 8 8 8"
+    ]
+  },
+  "beethoven": {
+    "title": "Op. 133",
+    "composer": "Ludwig van Beethoven",
+    "origin": "Austria (Vienna)",
+    "date": "composed 1825",
+    "coll": "Beethoven",
+    "part": "1st Violin",
+    "bar": 221,
+    "meter": "2/4",
+    "bars": 2,
+    "level": 4,
+    "n": 141,
+    "r": [
+      "16 16 16 16 16 16 16 16",
+      "16 16 16 16 8 16 16"
+    ]
+  },
+  "jig": {
+    "title": "Planxty Johnston",
+    "composer": "O'Carolan",
+    "origin": "Ireland",
+    "date": "published 1903, Chicago",
+    "coll": "O'Neill's Music of Ireland",
+    "part": "",
+    "bar": 10,
+    "meter": "6/8",
+    "bars": 2,
+    "level": 2,
+    "n": 7,
+    "r": [
+      "q 8 8 8 8",
+      "qd q 8r"
+    ]
+  },
+  "clave": {
+    "title": "Son clave (3-2)",
+    "composer": "",
+    "origin": "Cuba",
+    "date": "traditional",
+    "coll": "Standard Latin rhythms",
+    "part": "Claves",
+    "bar": null,
+    "meter": "4/4",
+    "bars": 2,
+    "level": 3,
+    "n": 1,
+    "r": [
+      "qd 8 qr q",
+      "qr q q qr"
+    ]
+  },
+  "mozart": {
+    "title": "K. 156, mvt. 3",
+    "composer": "Wolfgang Amadeus Mozart",
+    "origin": "Italy",
+    "date": "composed 1772",
+    "coll": "Mozart",
+    "part": "Violin I",
+    "bar": 19,
+    "meter": "3/4",
+    "bars": 2,
+    "level": 3,
+    "n": 5,
+    "r": [
+      "q q q",
+      "q 8r 8 8 8"
+    ]
+  }
+}

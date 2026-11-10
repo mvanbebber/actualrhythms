@@ -15,7 +15,8 @@
 - Corpus build: `tools/build_corpus.py` writes `data/rhythms.js` and `data/occurrences.js` (loaded on demand)
   and stamps their versions. Sources: music21's corpus (cached in `tools/.windows-cache.pkl`), Joplin
   (Craig Stuart Sapp), OpenEWLD (all songs, with the owner's permission), the Weimar Jazz Database,
-  `tools/latin.py`, and Michael Van Bebber's Charlie Parker transcriptions (`tools/parker.py`).
+  `tools/latin.py`, and Michael Van Bebber's Charlie Parker transcriptions from his book *Charlie Parker 60 Melodies and Solos*
+  (https://qpress.ca/product/60-melodies-solos-charlie-parker-omnibook) (`tools/parker.py`).
 - The Parker transcriptions are the owner's own work, from live recordings, published with his rights.
   Their processed excerpts are kept in `tools/parker-windows.json`, so a rebuild doesn't need the
   Sibelius exports; pass `--parker DIR` with fresh MusicXML exports to regenerate it.

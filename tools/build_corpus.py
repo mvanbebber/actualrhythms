@@ -44,13 +44,17 @@ COLLECTIONS = {
     'liliuokalani': ('Liliʻuokalani', 'classical'),
     'johnson_j_r': ('J. Rosamond Johnson', 'classical'),
     'leadSheet': ('Lead sheets', 'classical'),
-    'parkerbook': ('Charlie Parker transcriptions by Michael Van Bebber', 'jazz'),
+    'parkerbook': ('Charlie Parker 60 Melodies and Solos', 'jazz'),
     'wjd': ('Weimar Jazz Database', 'jazz'),
     'joplinrags': ("Scott Joplin's rags (Sapp edition)", 'ragtime'),
     'openewld': ('OpenEWLD lead sheets', 'popular'),
     'latin': ('Standard Latin rhythms', 'latin'),
 }
 
+# a credit and a link shown with a collection's name
+COLLECTION_EXTRA = {
+    'parkerbook': {'credit': 'transcribed by Michael Van Bebber', 'url': 'https://qpress.ca/product/60-melodies-solos-charlie-parker-omnibook'},
+}
 METERS = {'2/4', '3/4', '4/4', '2/2', '3/8', '6/8', '9/8', '12/8', '3/2', '6/4'}
 TYPE_CODE = {'whole': 'w', 'half': 'h', 'quarter': 'q', 'eighth': '8', '16th': '16', '32nd': '32'}
 FLAG_REST, FLAG_TIE, FLAG_TRIP, FLAG_TSTART, FLAG_TSTOP = 1, 2, 4, 8, 16
@@ -762,7 +766,8 @@ def main():
     data = {
         'version': 3, 'tpq': TPQ,
         'occurrences': occ_url,
-        'collections': {k: {'label': v[0], 'genre': v[1]} for k, v in COLLECTIONS.items()
+        'collections': {k: dict({'label': v[0], 'genre': v[1]}, **COLLECTION_EXTRA.get(k, {}))
+                        for k, v in COLLECTIONS.items()
                         if any(src[2] == k for src in sources)},  # only collections with pieces in this build
         'sources': sources,
         'rhythms': items,

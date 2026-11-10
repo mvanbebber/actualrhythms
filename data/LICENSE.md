@@ -11,8 +11,8 @@
   containing only US-public-domain songs;
 - the Weimar Jazz Database via the jazzodata package (https://github.com/klausfrieler/jazzodata), MIT license,
   © Klaus Frieler, Martin Pfleiderer, Wolf-Georg Zaddach, Jakob Abeßer.
-- Charlie Parker heads and solos transcribed from recordings by Michael Van Bebber (source folder
-  `parkerbook`), © Michael Van Bebber, **used with permission, all rights reserved**. These excerpts are not
+- Charlie Parker heads and solos transcribed from recordings by Michael Van Bebber for his book
+  *Charlie Parker 60 Melodies and Solos* (https://qpress.ca/product/60-melodies-solos-charlie-parker-omnibook) (source folder `parkerbook`), © Michael Van Bebber, **used with permission, all rights reserved**. These excerpts are not
   covered by the Creative Commons license below and may not be reused.
 
 Because it includes material adapted from the Joplin edition, the compiled rhythm data is shared under the

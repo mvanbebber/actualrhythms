@@ -976,7 +976,9 @@
     const surname = (composer || '').trim().split(/\s+/).pop();
     // (a collection that credits someone, like a transcriber, always shows)
     const redundant = folder !== 'parkerbook' && (HIDE_COLLECTION.has(folder) || (surname && coll.includes(surname)));
-    const from = redundant ? '' : `, from ${esc(coll)}`;
+    const cinfo = DATA.collections[folder];
+    const collName = cinfo.url ? `<a href="${esc(cinfo.url)}" target="_blank" rel="noopener"><em>${esc(coll)}</em></a>` : esc(coll);
+    const from = redundant ? '' : `, from ${collName}${cinfo.credit ? `, ${esc(cinfo.credit)}` : ''}`;
     const others = item.o.filter((o) => o[0] !== occ[0]).slice(0, 4).map((o) => {
       const src = DATA.sources[o[0]];
       const place = src[3] || (HIDE_COLLECTION.has(src[2]) ? '' : DATA.collections[src[2]].label);
@@ -1419,7 +1421,7 @@
     if (!item._hay) {
       item._hay = item.o.map((o) => {
         const src = DATA.sources[o[0]];
-        return [src[0], src[1], src[3], src[4], src[5], DATA.collections[src[2]].label, o[1]].join(' ');
+        return [src[0], src[1], src[3], src[4], src[5], DATA.collections[src[2]].label, DATA.collections[src[2]].credit || '', o[1]].join(' ');
       }).join(' ').toLowerCase();
     }
     return item._hay;

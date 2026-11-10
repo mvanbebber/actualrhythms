@@ -210,6 +210,7 @@ kbd {
 .source h3 { font: 400 20px/1.25 var(--font-serif); text-wrap: balance; }
 .source h3 em { color: var(--muted); font-size: 16px; }
 .source p { margin: 0; color: var(--muted); font-size: 14px; }
+.source p a { color: var(--teal); text-underline-offset: 2px; }
 .source ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14px; }
 .source .link-btn {
   justify-self: start; margin-top: var(--s1); padding: 6px 0; border: 0; background: none;

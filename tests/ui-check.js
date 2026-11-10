@@ -362,7 +362,11 @@ async function performTaps(p, { lateMs = 0, skipFirst = 0 } = {}) {
         check(up.x + up.w <= pd.x - 4, `tempo controls run under the Tap pad (${Math.round(up.x + up.w)} > ${Math.round(pd.x)})`);
       }
       const out = await box(p, '#outcome');
-      check(out.h >= 40 && out.y + 40 <= vh, `results/source area not visible (height ${Math.round(out.h)})`);
+      // landscape phones show the piece's name and the score in the top line, so the card below
+      // only has to stay reachable (it scrolls); everywhere else it needs real room
+      const minOut = dev.includes('iPhone') && dev.includes('landscape') ? 20 : 40;
+      check(out.h >= minOut && out.y + minOut <= vh, `results/source area not visible (height ${Math.round(out.h)})`);
+      if (minOut === 20) check(await p.isVisible('.meta-source'), 'landscape: the piece name should be in the top line');
       if (bars === 4 && dev === 'iPhone 15 Pro') {
         const s = await p.$eval('.sheet', (e) => ({ sh: e.scrollHeight, ch: e.clientHeight }));
         console.log(`  dense 4 bars: score box ${s.ch}px showing ${s.sh}px of notation${s.sh > s.ch ? ' (scrolls inside)' : ''}`);
@@ -373,7 +377,7 @@ async function performTaps(p, { lateMs = 0, skipFirst = 0 } = {}) {
         await p.waitForFunction(() => window.actualRhythms.result, null, { timeout: 30000 });
         await p.waitForTimeout(200);
         check(await p.evaluate(() => document.scrollingElement.scrollHeight <= document.scrollingElement.clientHeight + 1), 'page scrolls after results');
-        check(await p.isVisible('.result .bigscore'), 'score not visible in landscape results');
+        check(await p.isVisible('.score-chip'), 'landscape: the score should show in the top line after an attempt');
         await p.screenshot({ path: path.join(OUT, 'locked-iphone-landscape-result.png') });
       }
       await p.screenshot({ path: path.join(OUT, `locked-${dev.replace(/ /g, '-')}-${bars}bars.png`) });

@@ -448,7 +448,8 @@ html[data-touch][data-layout="phone-landscape"] .stage { display: contents; }
 html[data-touch][data-layout="phone-landscape"] .score-col { grid-column: 1; grid-row: 1; }
 html[data-touch][data-layout="phone-landscape"] .pad { grid-column: 2; grid-row: 1 / span 2; min-height: 0; }
 html[data-touch][data-layout="phone-landscape"] .outcome { grid-column: 1; grid-row: 2; }
-html[data-touch][data-layout="phone-landscape"] .sheet { max-height: 164px; } /* one staff row with up to four feedback lanes */ /* one staff row; longer excerpts scroll inside and follow the playhead */
+html[data-touch][data-layout="phone-landscape"] .sheet { max-height: 158px; } /* one staff row with up to four feedback lanes */
+html[data-touch][data-layout="phone-landscape"] .topbar { min-height: 40px; } /* one staff row; longer excerpts scroll inside and follow the playhead */
 html[data-touch][data-layout="phone-landscape"] .score-col { gap: 6px; }
 
 /* fixed header metrics so updating the practice count never nudges the score or pad */

@@ -16,7 +16,12 @@
     5: ['Advanced', 'Triplets, 32nds, sixteenth syncopation.'],
   };
   const GENRES = { folk: 'Folk tunes', chorale: 'Bach chorales', classical: 'Classical', ragtime: 'Ragtime', jazz: 'Jazz solos', popular: 'Popular songs', latin: 'Latin rhythms' };
-  const GRADE = { perfect: 0.035, good: 0.075 };
+  // Accuracy modes: 'perfect' earns full credit, 'good' 75%, anything else inside the matching window 40%.
+  const ACCURACY = {
+    easy: { label: 'Easy', perfect: 0.110, good: 0.160, cap: 0.25 },
+    normal: { label: 'Normal', perfect: 0.075, good: 0.110, cap: 0.2 },
+    pro: { label: 'Pro', perfect: 0.035, good: 0.075, cap: 0.2 },
+  };
   // every excerpt is played through more than once (written with a repeat sign): twice, or four
   // times for a one-bar pattern so there's time to settle into it
   const repeatsFor = (item) => (item && item.b === 1 ? 4 : 2);
@@ -64,6 +69,8 @@
   });
   S.genres = S.genres.filter((g) => GENRES[g]);
   if (!S.genres.length) S.genres = Object.keys(GENRES);
+  if (!ACCURACY[S.accuracy]) S.accuracy = 'normal';
+  const acc = () => ACCURACY[S.accuracy];
   const save = () => store.set('settings', S);
 
   const meterCounts = {};
@@ -819,7 +826,8 @@
   }
 
   // ---------- scoring ----------
-  function score(r) {
+  function score(r, record = true) {
+    const A = acc();
     const evs = current.flat.events;
     const onsets = [];
     const total = current.flat.total;
@@ -832,7 +840,7 @@
     onsets.forEach((o, k) => {
       const prev = k ? o.t - onsets[k - 1].t : Infinity;
       const next = k < onsets.length - 1 ? onsets[k + 1].t - o.t : Infinity;
-      o.win = Math.max(0.05, Math.min(0.2, prev / 2, next / 2));
+      o.win = Math.max(0.05, Math.min(A.cap, prev / 2, next / 2));
     });
     const taps = r.taps.filter((t) => t > r.t0 - 0.25);
     const pairs = [];
@@ -847,7 +855,7 @@
       if (o.err === undefined) o.grade = 'miss';
       else {
         const a = Math.abs(o.err);
-        o.grade = a <= GRADE.perfect ? 'perfect' : a <= GRADE.good ? 'good' : 'off';
+        o.grade = a <= A.perfect ? 'perfect' : a <= A.good ? 'good' : 'off';
         errs.push(o.err);
       }
       cnt[o.grade]++;
@@ -865,8 +873,10 @@
       const pass = j in tapPass ? tapPass[j] : Math.max(0, Math.min(R - 1, Math.floor(tick / total)));
       return { tick, pass, extra: !usedT.has(j), grade: j in tapOnset ? onsets[tapOnset[j]].grade : 'extra' };
     });
-    lastResult = { onsets, byEvent, tapTicks, cnt, extra, pct, mean, sd };
-    history.push({ d: Date.now(), p: pct, l: current.item.l });
+    const histEntry = record ? { d: Date.now(), p: pct, l: current.item.l } : (lastResult && lastResult.histEntry);
+    lastResult = { onsets, byEvent, tapTicks, cnt, extra, pct, mean, sd, run: { t0: r.t0, spt: r.spt, taps: r.taps }, histEntry, mode: S.accuracy };
+    if (record) history.push(histEntry);
+    else if (histEntry) histEntry.p = pct; // re-scored in another accuracy mode
     while (history.length > 500) history.shift();
     store.set('history', history);
     updateSession();
@@ -924,13 +934,13 @@
     return `<div class="card result">
       <div class="result-top"><div class="bigscore">${R.pct}<small>%</small></div><p class="verdict">${verdict}</p></div>
       <div class="counts">
-        <span class="count" style="--c:var(--perfect)">${R.cnt.perfect} within 35 ms</span>
-        <span class="count" style="--c:var(--good)">${R.cnt.good} within 75 ms</span>
+        <span class="count" style="--c:var(--perfect)">${R.cnt.perfect} within ${ms(acc().perfect)} ms</span>
+        <span class="count" style="--c:var(--good)">${R.cnt.good} within ${ms(acc().good)} ms</span>
         <span class="count" style="--c:var(--off)">${R.cnt.off} loose</span>
         <span class="count" style="--c:var(--miss)">${R.cnt.miss} missed</span>
         <span class="count" style="--c:var(--miss)">${R.extra} extra tap${R.extra === 1 ? '' : 's'}</span>
       </div>
-      <p class="legend">Under the staff, gray marks show where each note falls, one row for each time through. Dots are your taps: <span class="lg" style="--c:var(--perfect)">within 35 ms</span> <span class="lg" style="--c:var(--good)">within 75 ms</span> <span class="lg" style="--c:var(--off)">loose</span> <span class="lg" style="--c:var(--miss)">extra tap</span>. A mark with no dot is a missed note.</p>
+      <p class="legend">Under the staff, gray marks show where each note falls, one row for each time through. Dots are your taps (${acc().label} accuracy): <span class="lg" style="--c:var(--perfect)">within ${ms(acc().perfect)} ms, full credit</span> <span class="lg" style="--c:var(--good)">within ${ms(acc().good)} ms</span> <span class="lg" style="--c:var(--off)">loose</span> <span class="lg" style="--c:var(--miss)">extra tap</span>. A mark with no dot is a missed note.</p>
     </div>`;
   }
 
@@ -1104,6 +1114,8 @@
     }
     $('metro').setAttribute('aria-checked', String(!!S.metro));
     $('tapSoundSw').setAttribute('aria-checked', String(!!S.tapSound));
+    const A = acc();
+    $('accuracyHelp').textContent = `Full credit within ${Math.round(A.perfect * 1000)} ms of the note, 75% within ${Math.round(A.good * 1000)} ms.`;
     $('lowLatencySw').setAttribute('aria-checked', String(!!S.lowLatency));
     $('silentSw').setAttribute('aria-checked', String(!!S.silentMode));
     $('hideSource').setAttribute('aria-checked', String(!!S.hideSource));
@@ -1126,6 +1138,11 @@
     toggleGroup($('levels'), Object.keys(LEVELS).map((k) => ({ val: Number(k), label: k, aria: `Level ${k}, ${LEVELS[k][0]}` })), 'levels', true);
     $('levelHelp').innerHTML = Object.entries(LEVELS).map(([k, v]) => `<dt>${k} ${esc(v[0])}</dt><dd>${esc(v[1])}</dd>`).join('');
     toggleGroup($('lengths'), [{ val: 2, label: '2 bars' }, { val: 4, label: '4 bars' }], 'bars', false);
+    toggleGroup($('accuracy'), Object.entries(ACCURACY).map(([k, v]) => ({ val: k, label: v.label })), 'accuracy', false, false);
+    $('accuracy').addEventListener('click', () => {
+      // re-score the last attempt so the modes can be compared on the same playing
+      if (lastResult && lastResult.run && lastResult.mode !== S.accuracy) { score(lastResult.run, false); render(); renderOutcome(); }
+    });
     toggleGroup($('meters'), PRIMARY_METERS.map((m) => ({ val: m, label: m })), 'meters', true);
     toggleGroup($('metersMore'), MORE_METERS.map((m) => ({ val: m, label: m })), 'meters', true);
     if (MORE_METERS.length) {

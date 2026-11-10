@@ -1552,8 +1552,8 @@
     const title = (it) => DATA.sources[it.o[0][0]][0];
     const cmp = {
       common: (x, y) => y.n - x.n || x.l - y.l,
-      easy: (x, y) => x.l - y.l || y.n - x.n,
-      hard: (x, y) => y.l - x.l || y.n - x.n,
+      easy: (x, y) => x.l - y.l || (x.d || 0) - (y.d || 0) || y.n - x.n,
+      hard: (x, y) => (y.d || 0) - (x.d || 0) || y.l - x.l || y.n - x.n,
       title: (x, y) => title(x).localeCompare(title(y)),
     }[$('corpusSort').value];
     list.sort(cmp);

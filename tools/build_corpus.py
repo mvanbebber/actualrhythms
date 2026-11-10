@@ -461,6 +461,61 @@ def windows_from_bars(bars, src):
     return out
 
 
+def complexity(meter_str, measures):
+    """A finer reading-difficulty score than the five levels, for sorting: how varied the values are, how
+    often they change, syncopation, offbeat attacks and rests, ties, triplets (most of all mixed with
+    sixteenths), with repeated bars counting less. Returns an int (score x 10)."""
+    num, den = map(int, meter_str.split('/'))
+    compound = den == 8 and num % 3 == 0 and num > 3
+    beat = TPQ * 4 // den * (3 if compound else 1)
+    half = beat // (3 if compound else 2)
+    bar = TPQ * 4 // den * num
+    flat = [e[:3] for m in measures for e in m]
+    # tokens: sounding notes (ties merged) and rests
+    toks, pos, k = [], 0, 0
+    while k < len(flat):
+        t, code, fl = flat[k]
+        start = pos
+        L = t
+        while not fl & FLAG_REST and fl & FLAG_TIE and k + 1 < len(flat):
+            k += 1
+            pos += t
+            t, code2, fl = flat[k]
+            L += t
+        toks.append((start, L, bool(flat[k][2] & FLAG_REST) if L == t else False, bool(fl & FLAG_TRIP)))
+        pos += t
+        k += 1
+    values = [(L, r) for _, L, r, _ in toks]
+    distinct = len(set(values))
+    changes = sum(1 for a, b in zip(values, values[1:]) if a != b)
+    sync8 = sync16 = off16 = offrests = 0
+    for start, L, rest, trip in toks:
+        p = start % beat
+        if rest:
+            offrests += p != 0
+            continue
+        if trip:
+            continue
+        if p and p % half:
+            off16 += 1
+            sync16 += p + L > beat
+        elif p:
+            sync8 += p + L > beat
+    ties = sum(1 for t, code, fl in flat if fl & FLAG_TIE and not fl & FLAG_REST)
+    trip_groups = sum(1 for t, code, fl in flat if fl & FLAG_TSTART)
+    bars = len(measures)
+    mixed = 0
+    for m in measures:
+        has_trip = any(e[2] & FLAG_TRIP for e in m)
+        has16 = any(not e[2] & FLAG_TRIP and e[1].startswith(('16', '32')) for e in m)
+        mixed += has_trip and has16
+    keys = [json.dumps([e[:3] for e in m]) for m in measures]
+    repeats = sum(1 for a, b in zip(keys, keys[1:]) if a == b) / max(1, bars - 1)
+    per_bar = (changes + 3 * sync16 + 2 * sync8 + off16 + 1.5 * trip_groups + 2 * mixed + offrests + ties) / bars
+    score = (per_bar + 1.5 * distinct) * (1 - 0.4 * repeats)
+    return int(round(score * 10))
+
+
 def difficulty(meter_str, measures):
     """1 = beats only ... 5 = triplets / 32nds / 16th syncopation."""
     num, den = map(int, meter_str.split('/'))
@@ -745,6 +800,7 @@ def main():
     items = []
     for u in uniq.values():
         u['l'] = difficulty(u['m'], u['r'])
+        u['d'] = complexity(u['m'], u['r'])
         items.append(u)
     items.sort(key=lambda u: (u['b'], u['l'], u['m'], -u['n']))
 

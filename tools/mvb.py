@@ -62,6 +62,8 @@ OVERRIDES = {
     'Where You At?': {'title': 'Where You At?'},
     'sandu - Freddie Hubbard': {'title': 'Sandu'},
     'Lazy Bird - Solos': {'title': 'Lazy Bird'},
+    'Chessmates': {'performer': 'Joe Lovano', 'tune_by': 'Joe Lovano'},
+    "I've Found a New Baby - Sidney Bechet": {'performer': 'Sidney Bechet'},
 }
 INSTRUMENT_WORDS = r'\s+(?:tenor|alto|baritone|soprano|trumpet|piano|guitar|bass|drums|sax|saxophone)$'
 

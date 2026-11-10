@@ -1,4 +1,4 @@
-// UI + behaviour check for Actual Rhythms. Run:  node tests/ui-check.js [screenshotDir]
+// UI + behavior check for Actual Rhythms. Run:  node tests/ui-check.js [screenshotDir]
 // Needs Playwright (require('playwright')) with Chromium. Serves the repo itself on a free port.
 const http = require('http');
 const fs = require('fs');
@@ -316,7 +316,7 @@ async function performTaps(p, { lateMs = 0, skipFirst = 0 } = {}) {
     await p.context().close();
   }
 
-  // 5b. corpus browser: opens from the settings summary, lists every rhythm, search/sort/filter, tap to practise
+  // 5b. corpus browser: opens from the settings summary, lists every rhythm, search/sort/filter, tap to practice
   for (const [w, h, touch, label] of [[1440, 900, false, 'laptop'], [390, 844, true, 'phone']]) {
     console.log('corpus browser ' + label);
     const p = await newPage(browser, base, w, h, touch, { levels: [2], bars: 2 });
@@ -378,7 +378,7 @@ async function performTaps(p, { lateMs = 0, skipFirst = 0 } = {}) {
       await p.click('#corpusWhole');
       check((await p.textContent('#corpusCount')).includes('rhythms in the corpus'), 'Show the whole corpus should leave the family view');
       await p.keyboard.press('Escape');
-      // a passage only in the full list (not in rhythms.js) can be practised
+      // a passage only in the full list (not in rhythms.js) can be practiced
       await p.click('#outcome .source [data-action="family"] >> nth=0');
       await p.waitForSelector('#corpus:not([hidden]) .c-row');
       await p.$eval('#corpusScroll', (e) => { e.scrollTop = e.scrollHeight; });

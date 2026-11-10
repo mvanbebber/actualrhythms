@@ -289,7 +289,7 @@ def score_tempos(s):
 
 def process_parker(path):
     """One Charlie Parker transcription (tools/parker.py): the concert-pitch first staff only,
-    each excerpt labelled head, solo or the other player from the score's text marks."""
+    each excerpt labeled head, solo or the other player from the score's text marks."""
     import parker
     try:
         s = next(iter_scores(path))
@@ -547,13 +547,25 @@ def main():
                 found.append(w)
         print(f'jazz: {len(found) - n0} windows from the Weimar Jazz Database', file=sys.stderr)
 
+    # Michael Van Bebber's Charlie Parker transcriptions: parsed with --parker, otherwise read from the
+    # processed excerpts saved by the last parse (so a rebuild doesn't need the Sibelius exports)
+    import parker
+    parker_cache = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'parker-windows.json')
+    book = []
     if args.parker:
-        import glob, parker
+        import glob
         paths = sorted(glob.glob(os.path.join(args.parker, '*.musicxml')) + glob.glob(os.path.join(args.parker, '*.mxl')))
-        book = []
         with Pool(args.jobs) as pool:
             for res in pool.imap_unordered(process_parker, paths):
                 book.extend(res)
+        book.sort(key=lambda w: (w['src']['title'], w['src']['bar'], w['bars']))
+        with open(parker_cache, 'w') as f:
+            json.dump(book, f, separators=(',', ':'), ensure_ascii=False)
+        print(f'parker: parsed {len(paths)} transcriptions, saved {parker_cache}', file=sys.stderr)
+    elif os.path.exists(parker_cache):
+        with open(parker_cache) as f:
+            book = json.load(f)
+    if book:
         # the same recorded solo from the Weimar Jazz Database gives way to the book's transcription
         tunes = {}
         for w in book:
@@ -568,7 +580,7 @@ def main():
         gone = sorted({w['src']['title'] for w in found if replaced(w)})
         found = [w for w in found if not replaced(w)]
         found.extend(book)
-        print(f'parker: {len(book)} windows from {len(paths)} transcriptions; replaces WJD solos: {", ".join(gone)}', file=sys.stderr)
+        print(f'parker: {len(book)} windows; replaces WJD solos: {", ".join(gone)}', file=sys.stderr)
 
     # a triplet group must start on its own grid (a beat for triplet eighths, half a beat for triplet
     # sixteenths, half a bar for triplet quarters); one that starts off the beat and runs into the next

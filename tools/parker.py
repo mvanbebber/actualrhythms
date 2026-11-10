@@ -12,7 +12,7 @@ place and date, the record and the composer:
     (Savoy MG 12009) / By Charlie Parker / Transcribed by Michael Van Bebber
 
 Text marks in the score say who is playing: (Head), (Solo), (Improv.), (Intro), and (Tpt.), (Piano),
-(Drums) ... for passages by someone else. Each excerpt is labelled by the marks in force at its first bar.
+(Drums) ... for passages by someone else. Each excerpt is labeled by the marks in force at its first bar.
 """
 import re
 

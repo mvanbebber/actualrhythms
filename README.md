@@ -24,6 +24,7 @@ Every excerpt plays twice (it's written with a repeat sign). **→ / N** loads t
 | Popular songs | All 568 lead sheets in [OpenEWLD](https://github.com/00sapo/OpenEWLD): Tin Pan Alley, Broadway, standards, traditional songs. Songs that are not US public domain (first performed after 1930) are included with the site owner's permission; without `--openewld-all` the build keeps only US public domain |
 | Latin rhythms | 19 standard patterns written out in `tools/latin.py`, each with its origin and a short description: son and rumba clave (3-2 and 2-3), bossa nova clave and bass, cáscara (3-2 and 2-3), tresillo, habanera, cinquillo, milonga, cha-cha-chá, tumbao, reggaetón dembow, samba bass drum, sesquialtera, the 6/8 bell and 6/8 clave. These are the patterns as conventionally notated, not excerpts of single recordings, written in as few bars as they need (one-bar patterns play four times, two-bar patterns twice) and checked at build time against the imaginary-barline rule: nothing crosses the middle of a 4/4 or 12/8 bar, and nothing that starts off the beat runs into the next beat. They show whatever Length is set to, and are linked to corpus excerpts whose notes fall in the same places |
 | Jazz solos | 456 transcribed improvisations from the [Weimar Jazz Database](https://jazzomat.hfm-weimar.de/) (Armstrong, Parker, Rollins, Coltrane, Davis, Brecker and others), via the MIT-licensed [jazzodata](https://github.com/klausfrieler/jazzodata) export |
+| Charlie Parker | 59 heads and solos (1944–1953) transcribed from the recordings by Michael Van Bebber, used with permission, all rights reserved. Read from the concert-pitch staff of his Sibelius scores (exported as MusicXML), labeled head, solo or trumpet from the score's text marks, with the session, record and metronome mark of each tune. They replace the Weimar Jazz Database's transcriptions of the same recordings. The processed excerpts are kept in `tools/parker-windows.json`; pass `--parker DIR` with the MusicXML exports to regenerate them |
 
 For multi-voice staves (piano, divisi) it reads the busiest voice in each bar. For each line it keeps complete bars only, splits them into 2- and 4-bar windows, drops windows that start in the middle of a tied note or use tuplets other than triplets, and deduplicates identical rhythms (keeping up to five sources each, with their pitches). Each rhythm is then graded:
 
@@ -80,7 +81,7 @@ git clone --depth 1 https://github.com/craigsapp/joplin /tmp/joplin
 python3 tools/build_corpus.py --wjd /tmp/jazzodata/data --openewld /tmp/OpenEWLD --openewld-all --joplin /tmp/joplin
 ```
 
-The Joplin edition is licensed CC BY-NC-SA 4.0, so the rhythm data that includes it is shared under the same licence (see `data/LICENSE.md`) and Actual Rhythms stays free and non-commercial.
+The Joplin edition is licensed CC BY-NC-SA 4.0, so the rhythm data that includes it is shared under the same license (see `data/LICENSE.md`) and Actual Rhythms stays free and non-commercial.
 
 Jazz solos are spelled into notation by `tools/wjd.py`: the database gives each note's bar, beat and subdivision; notes are held to the next attack (or to their transcribed length at phrase ends), split at beat boundaries with ties, and beats subdivided in 3 or 6 become triplets. Swing eighths are written straight, as on any jazz chart.
 

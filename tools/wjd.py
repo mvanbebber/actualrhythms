@@ -3,7 +3,7 @@
 The WJD (Jazzomat Research Project, HfM Weimar) holds 456 expert transcriptions
 of improvised jazz solos, Louis Armstrong to Michael Brecker. Each note has its
 bar, beat, and position within the beat (tatum out of `division`), so the
-rhythm is already quantised the way a transcriber heard it. We read the
+rhythm is already quantized the way a transcriber heard it. We read the
 MIT-licensed export in Klaus Frieler's `jazzodata` R package
 (https://github.com/klausfrieler/jazzodata, data/wjd_transforms.rda and
 data/wjd_meta.rda) and spell each bar as notation:

@@ -235,7 +235,7 @@
     const stave = new VF.Stave(x, y, w, { num_lines: 1, spacing_between_lines_px: 10, space_above_staff_ln: 4 });
     if (mIdx === 0) {
       const ts = new VF.TimeSignature(item.m);
-      ts.topLine -= 2; ts.bottomLine -= 2; // centre the digits on a one-line staff
+      ts.topLine -= 2; ts.bottomLine -= 2; // center the digits on a one-line staff
       stave.addModifier(ts);
     }
     stave.setBegBarType(VF.Barline.type.NONE).setEndBarType(VF.Barline.type.NONE);
@@ -410,9 +410,9 @@
     return null;
   }
 
-  // dots under each note (one lane per pass, coloured by grade) and tick marks for each tap
+  // dots under each note (one lane per pass, colored by grade) and tick marks for each tap
   // Under the staff, one lane per pass: a gray tick where each note falls, and a dot where
-  // each tap landed, centred on the tick's midline and coloured by its timing.
+  // each tap landed, centered on the tick's midline and colored by its timing.
   const TICK_COLOR = '#9AA19C';
   const TAP_COLOR = { perfect: GRADE_COLOR.perfect, good: GRADE_COLOR.good, off: GRADE_COLOR.off, extra: GRADE_COLOR.miss };
   function drawTapMarks() {
@@ -941,7 +941,7 @@
     const mean = errs.length ? errs.reduce((a, b) => a + b, 0) / errs.length : 0;
     const sd = errs.length > 1 ? Math.sqrt(errs.reduce((a, b) => a + (b - mean) ** 2, 0) / (errs.length - 1)) : 0;
     const byEvent = {};
-    // a note's colour on the staff is its worse result across the passes
+    // a note's color on the staff is its worse result across the passes
     onsets.forEach((o) => { if (!byEvent[o.idx] || WORSE[o.grade] > WORSE[byEvent[o.idx].grade]) byEvent[o.idx] = o; });
     const tapTicks = taps.map((t, j) => {
       const tick = (t - r.t0) / r.spt;
@@ -1406,7 +1406,7 @@
     if (!current) render();
   }
 
-  // ---------- corpus browser: every rhythm, searchable; tap one to practise it ----------
+  // ---------- corpus browser: every rhythm, searchable; tap one to practice it ----------
   const CORPUS_ROW = 112;
   let corpusOpen = false;
   let corpusList = [];
@@ -1533,7 +1533,7 @@
       el.type = 'button'; el.className = 'c-row'; el.dataset.i = i;
       el.style.top = (i * CORPUS_ROW) + 'px';
       el.innerHTML = corpusFamily ? familyRowHTML(corpusList[i]) : corpusRowHTML(corpusList[i]);
-      el.setAttribute('aria-label', `Practise: ${el.textContent.replace(/\s+/g, ' ').trim()}`);
+      el.setAttribute('aria-label', `Practice: ${el.textContent.replace(/\s+/g, ' ').trim()}`);
       $('corpusSpacer').appendChild(el);
       rowEls.set(i, el);
     }
@@ -1652,7 +1652,7 @@
     const back = corpusOpener && corpusOpener.isConnected && corpusOpener.getClientRects().length ? corpusOpener : $('btnPlay');
     back.focus({ preventScroll: true });
   }
-  function practiseItem(item, chosen) {
+  function practiceItem(item, chosen) {
     const occs = item.o.filter((o) => S.genres.includes(genreOf(o)));
     const occ = chosen || (occs.length ? occs : item.o)[0];
     if (run) stopRun(true);
@@ -1680,7 +1680,7 @@
       if (!row) return;
       const entry = corpusList[Number(row.dataset.i)];
       closeCorpus();
-      if (entry.item) practiseItem(entry.item, entry.occ); else practiseItem(entry);
+      if (entry.item) practiceItem(entry.item, entry.occ); else practiceItem(entry);
       setButtons();
     });
     window.addEventListener('resize', () => { if (corpusOpen) { measureCorpus(); renderCorpusRows(); } });

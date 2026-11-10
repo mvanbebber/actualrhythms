@@ -975,7 +975,7 @@
     // skip the collection when it adds nothing: Essen (origin says more) or a single-composer folder ('Beethoven')
     const surname = (composer || '').trim().split(/\s+/).pop();
     // (a collection that credits someone, like a transcriber, always shows)
-    const redundant = folder !== 'parkerbook' && (HIDE_COLLECTION.has(folder) || (surname && coll.includes(surname)));
+    const redundant = !['parkerbook', 'mvbjazz', 'mvbsongs'].includes(folder) && (HIDE_COLLECTION.has(folder) || (surname && coll.includes(surname)));
     const cinfo = DATA.collections[folder];
     const collName = cinfo.url ? `<a href="${esc(cinfo.url)}" target="_blank" rel="noopener"><em>${esc(coll)}</em></a>` : esc(coll);
     const from = redundant ? '' : `, from ${collName}${cinfo.credit ? `, ${esc(cinfo.credit)}` : ''}`;

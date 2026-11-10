@@ -14,9 +14,12 @@
 - Charlie Parker heads and solos transcribed from recordings by Michael Van Bebber for his book
   *Charlie Parker 60 Melodies and Solos* (https://qpress.ca/product/60-melodies-solos-charlie-parker-omnibook) (source folder `parkerbook`), © Michael Van Bebber, **used with permission, all rights reserved**. These excerpts are not
   covered by the Creative Commons license below and may not be reused.
+- Jazz solos, heads, lead sheets and arrangements, and soul, funk, pop and rock songs, transcribed from
+  recordings by Michael Van Bebber (source folders `mvbjazz` and `mvbsongs`), © Michael Van Bebber,
+  **used with permission, all rights reserved**, likewise not covered by the license below.
 
 Because it includes material adapted from the Joplin edition, the compiled rhythm data is shared under the
 **Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International** license
 (https://creativecommons.org/licenses/by-nc-sa/4.0/), except for the permission-based OpenEWLD songs noted above,
-whose rights stay with their owners, and the Charlie Parker transcriptions, which are all rights reserved. You may reuse the rest for non-commercial purposes if you credit
+whose rights stay with their owners, and Michael Van Bebber's transcriptions (the Charlie Parker book and his other jazz and song transcriptions), which are all rights reserved. You may reuse the rest for non-commercial purposes if you credit
 the sources above and share your adaptations under the same license.

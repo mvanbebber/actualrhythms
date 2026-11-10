@@ -45,6 +45,8 @@ COLLECTIONS = {
     'johnson_j_r': ('J. Rosamond Johnson', 'classical'),
     'leadSheet': ('Lead sheets', 'classical'),
     'parkerbook': ('Charlie Parker 60 Melodies and Solos', 'jazz'),
+    'mvbjazz': ('Jazz transcriptions by Michael Van Bebber', 'jazz'),
+    'mvbsongs': ('Song transcriptions by Michael Van Bebber', 'popular'),
     'wjd': ('Weimar Jazz Database', 'jazz'),
     'joplinrags': ("Scott Joplin's rags (Sapp edition)", 'ragtime'),
     'openewld': ('OpenEWLD lead sheets', 'popular'),
@@ -55,6 +57,7 @@ COLLECTIONS = {
 COLLECTION_EXTRA = {
     'parkerbook': {'credit': 'transcribed by Michael Van Bebber', 'url': 'https://qpress.ca/product/60-melodies-solos-charlie-parker-omnibook'},
 }
+UNPITCHED_MIDI = 72
 METERS = {'2/4', '3/4', '4/4', '2/2', '3/8', '6/8', '9/8', '12/8', '3/2', '6/4'}
 TYPE_CODE = {'whole': 'w', 'half': 'h', 'quarter': 'q', 'eighth': '8', '16th': '16', '32nd': '32'}
 FLAG_REST, FLAG_TIE, FLAG_TRIP, FLAG_TSTART, FLAG_TSTOP = 1, 2, 4, 8, 16
@@ -97,10 +100,13 @@ def event_of(n):
     else:
         if n.tie is not None and n.tie.type in ('start', 'continue'):
             flags |= FLAG_TIE
-        if n.isChord:
-            midi = max(p.midi for p in n.pitches)
-        else:
+        pitches = getattr(n, 'pitches', None) or ()
+        if n.isChord and pitches:
+            midi = max(p.midi for p in pitches)
+        elif getattr(n, 'pitch', None) is not None and hasattr(n.pitch, 'midi'):
             midi = n.pitch.midi
+        else:
+            midi = UNPITCHED_MIDI  # drums: one note on the piano
     tie_in = (not n.isRest) and n.tie is not None and n.tie.type in ('stop', 'continue')
     return [int(ticks), code, flags, midi], tie_in
 
@@ -322,6 +328,45 @@ def process_parker(path):
         return []
 
 
+def process_mvb(path):
+    """One of Michael Van Bebber's transcriptions (tools/mvb.py): every staff with its own line,
+    labeled by instrument; transposing staves are read at sounding pitch."""
+    import mvb
+    try:
+        s = next(iter_scores(path))
+        md = s.metadata
+        c = mvb.credits(path, md.title if md else '', md.composer if md else '')
+        tempo_at = score_tempos(s)
+        parts = [p for p in s.parts if any(not n.isRest for n in p.recurse().notes)]
+        labels = mvb.staff_labels(parts, c)
+        out, seen = [], []
+        for part, label in zip(parts, labels):
+            # the same line in another transposition: same rhythm bar for bar
+            sig = []
+            for m in part.getElementsByClass('Measure'):
+                sig.append(tuple((n.quarterLength, n.isRest) for n in m.recurse().notesAndRests if n.quarterLength))
+            if any(sum(a == b for a, b in zip(sig, t)) >= 0.9 * max(len(sig), 1) for t in seen):
+                continue
+            seen.append(sig)
+            if part.getInstrument().transposition is not None:
+                try:
+                    part = part.toSoundingPitch()
+                except Exception:
+                    pass
+            bar_offsets = {m.number: float(m.offset) for m in part.getElementsByClass('Measure')}
+            for w in extract_part(part, label, c['title'], c['composer'], c['folder']):
+                bar = w['src']['bar']
+                w['src'].update({'origin': c['origin'], 'date': c['date'], 'note': c['note'],
+                                 'file': os.path.basename(path), 'year': c['year']})
+                off = bar_offsets.get(bar)
+                w['tempo'] = tempo_at(off) if off is not None else None
+                out.append(w)
+        return out
+    except Exception as e:
+        print(f'mvb: {os.path.basename(path)}: {e}', file=sys.stderr)
+        return []
+
+
 def process_file(args):
     path, folder = args[0], args[1]
     meta = args[2] if len(args) > 2 else None
@@ -480,6 +525,8 @@ def main():
                     help='with --openewld: keep every song, not only US public domain (requires permission)')
     ap.add_argument('--parker', metavar='DIR',
                     help='MusicXML exports of Michael Van Bebber\'s Charlie Parker transcriptions (used with permission)')
+    ap.add_argument('--mvb', metavar='DIR',
+                    help="MusicXML exports of Michael Van Bebber's transcriptions (used with permission)")
     ap.add_argument('--wjd', metavar='DIR',
                     help="jazzodata's data/ folder (git clone https://github.com/klausfrieler/jazzodata); adds jazz solos")
     args = ap.parse_args()
@@ -569,22 +616,41 @@ def main():
     elif os.path.exists(parker_cache):
         with open(parker_cache) as f:
             book = json.load(f)
+    # Michael Van Bebber's other transcriptions (jazz and songs), the same way
+    mvb_cache = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mvb-windows.json')
+    mine = []
+    if args.mvb:
+        import glob
+        paths = sorted(glob.glob(os.path.join(args.mvb, '**', '*.musicxml'), recursive=True)
+                       + glob.glob(os.path.join(args.mvb, '**', '*.mxl'), recursive=True))
+        with Pool(args.jobs) as pool:
+            for res in pool.imap_unordered(process_mvb, paths):
+                mine.extend(res)
+        mine.sort(key=lambda w: (w['src']['file'], w['src']['part'], w['src']['bar'], w['bars']))
+        with open(mvb_cache, 'w') as f:
+            json.dump(mine, f, separators=(',', ':'), ensure_ascii=False)
+        print(f'mvb: parsed {len(paths)} transcriptions, saved {mvb_cache}', file=sys.stderr)
+    elif os.path.exists(mvb_cache):
+        with open(mvb_cache) as f:
+            mine = json.load(f)
+    book = book + mine
     if book:
-        # the same recorded solo from the Weimar Jazz Database gives way to the book's transcription
+        # the same recorded solo from the Weimar Jazz Database gives way to the owner's transcription
         tunes = {}
-        for w in book:
-            tunes.setdefault(parker.norm_title(w['src']['title']), set()).add(w['src'].get('year'))
+        for w in book:  # only solo transcriptions (a lead sheet is not the recorded solo)
+            if w['src']['folder'] == parker.FOLDER or w['src']['part'] == 'Solo':
+                tunes.setdefault((parker.norm_title(w['src']['title']), w['src']['composer']), set()).add(w['src'].get('year'))
         def replaced(w):
             s = w['src']
-            if s['folder'] != 'wjd' or s['composer'] != 'Charlie Parker':
+            if s['folder'] != 'wjd':
                 return False
-            years = tunes.get(parker.norm_title(s['title']))
+            years = tunes.get((parker.norm_title(re.sub(r',\s*solo \d+$', '', s['title'])), s['composer']))
             m = re.search(r'(19\d\d)', s.get('date') or '')
             return years is not None and (None in years or (m and int(m.group(1)) in years))
         gone = sorted({w['src']['title'] for w in found if replaced(w)})
         found = [w for w in found if not replaced(w)]
         found.extend(book)
-        print(f'parker: {len(book)} windows; replaces WJD solos: {", ".join(gone)}', file=sys.stderr)
+        print(f'parker + mvb: {len(book)} windows; replace WJD solos: {", ".join(gone)}', file=sys.stderr)
 
     # a triplet group must start on its own grid (a beat for triplet eighths, half a beat for triplet
     # sixteenths, half a bar for triplet quarters); one that starts off the beat and runs into the next

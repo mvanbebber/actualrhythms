@@ -16,7 +16,9 @@
   and stamps their versions. Sources: music21's corpus (cached in `tools/.windows-cache.pkl`), Joplin
   (Craig Stuart Sapp), OpenEWLD (all songs, with the owner's permission), the Weimar Jazz Database,
   `tools/latin.py`, and Michael Van Bebber's Charlie Parker transcriptions from his book *Charlie Parker 60 Melodies and Solos*
-  (https://qpress.ca/product/60-melodies-solos-charlie-parker-omnibook) (`tools/parker.py`).
+  (https://qpress.ca/product/60-melodies-solos-charlie-parker-omnibook) (`tools/parker.py`), and his other
+  jazz and song transcriptions (`tools/mvb.py`).
 - The Parker transcriptions are the owner's own work, from live recordings, published with his rights.
   Their processed excerpts are kept in `tools/parker-windows.json`, so a rebuild doesn't need the
-  Sibelius exports; pass `--parker DIR` with fresh MusicXML exports to regenerate it.
+  Sibelius exports; pass `--parker DIR` with fresh MusicXML exports to regenerate it. The same goes for his
+  other transcriptions: `tools/mvb-windows.json`, regenerated with `--mvb DIR`.

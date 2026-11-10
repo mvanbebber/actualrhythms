@@ -156,6 +156,17 @@ kbd {
 }
 .tempo-input::-webkit-outer-spin-button, .tempo-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 .tempo-beat { color: var(--muted); font-size: 12px; }
+/* Original: play at the excerpt's own tempo when the source gives one */
+.tempo-orig {
+  height: var(--control-h); padding: 0 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--ink); font: inherit; font-weight: 600; font-size: 13px; cursor: pointer; white-space: nowrap;
+}
+.tempo-orig:hover { border-color: var(--teal); }
+.tempo-orig[aria-pressed="true"] { background: var(--teal); border-color: var(--teal); color: #fff; }
+/* on, but this excerpt has no known tempo: the slider's tempo is used */
+.tempo-orig[aria-pressed="true"].na { background: var(--teal-pale); border-color: var(--teal); border-style: dashed; color: var(--teal); }
+.tempo-orig.na:not([aria-pressed="true"]) { color: var(--muted); }
+.orig-on .tempo-value { border-color: var(--teal); color: var(--teal); }
 .tempo-beat:empty { display: none; }
 
 /* ---------- tap pad ---------- */
@@ -466,7 +477,8 @@ html[data-layout="medium"] .wordmark, html[data-layout="wide"] .wordmark { line-
 html[data-layout="phone-landscape"] .transport .btn { padding: 0 10px; gap: 6px; }
 html[data-layout="phone-landscape"] .tempo { gap: 4px; padding-left: var(--s2); }
 html[data-layout="phone-landscape"] .tempo-unit { display: none; }
-html[data-layout="phone-landscape"] .tempo-slider { width: 96px; }
+html[data-layout="phone-landscape"] .tempo-slider { width: 44px; }
+html[data-layout="phone-landscape"] .tempo-orig { padding: 0 6px; font-size: 12px; }
 html[data-layout="phone-landscape"] .tempo-value, html[data-layout="phone-landscape"] .tempo-input { min-width: 0; width: 56px; padding: 0 4px; }
 
 .legend .lg { white-space: nowrap; }
@@ -533,3 +545,9 @@ html[data-layout="phone"] .tempo-slider { flex: 1; min-width: 0; width: auto; }
 .chip.score-chip { background: var(--teal); color: #fff; font-weight: 700; flex: none; }
 html[data-layout="phone"] .pool-note, html[data-layout="phone-landscape"] .pool-note { display: none; }
 #countin small { display: block; font: 600 14px/1.2 var(--font-sans); color: var(--teal); margin-top: 6px; text-align: center; }
+
+/* narrow phones: the tempo row (slider, Original, number) must fit; the beat note goes */
+@media (max-width: 360px) {
+  html[data-layout="phone"] .tempo-beat { display: none; }
+  html[data-layout="phone"] .tempo-orig { padding: 0 8px; font-size: 12px; }
+}

@@ -199,4 +199,5 @@ def wjd_bars(data_dir, flags):
         tune_by = (m['composer'] or '').strip()
         yield {'title': title, 'composer': m['performer'], 'folder': 'wjd', 'part': part[0].upper() + part[1:],
                'date': f'recorded {year}' if year else None,
-               'note': f'Tune by {tune_by}' if tune_by and tune_by != m['performer'] else None}, lst
+               'note': f'Tune by {tune_by}' if tune_by and tune_by != m['performer'] else None,
+               'tempo': float(m['avgtempo']) if m['avgtempo'] == m['avgtempo'] and m['avgtempo'] > 0 else None}, lst

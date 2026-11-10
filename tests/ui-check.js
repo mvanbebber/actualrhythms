@@ -272,6 +272,22 @@ async function performTaps(p, { lateMs = 0, skipFirst = 0 } = {}) {
     await p.fill('#tempo', '73'); await p.press('#tempo', 'Enter');
     check(await tempoNow() === 74 && await p.isHidden('#tempo') && await p.inputValue('#tempoSlider') === '74', 'typed tempo rounds to the 2-BPM grid and moves the slider');
     check(await p.isVisible('#outcome .source h3'), 'source should be visible by default');
+    // Original: an excerpt with a known tempo plays at it; the slider switches it off
+    {
+      const known = await p.evaluate(() => window.RHYTHM_DATA.rhythms.findIndex((r) => r.o[0][4] && !r.f && r.m === '4/4'));
+      const none = await p.evaluate(() => window.RHYTHM_DATA.rhythms.findIndex((r) => !r.o[0][4] && !r.f && r.m === '4/4'));
+      check(known >= 0 && none >= 0, 'corpus should have excerpts with and without a known tempo');
+      await p.evaluate((i) => window.actualRhythms.show(i), known);
+      const q = await p.evaluate((i) => window.RHYTHM_DATA.rhythms[i].o[0][4], known);
+      await p.click('#btnOrig');
+      check(await p.textContent('#tempoNum') === String(q), `Original should show the excerpt's tempo (${q}), got ${await p.textContent('#tempoNum')}`);
+      check(/Tempo: \d+ BPM/.test(await p.textContent('#outcome .source')), 'source card should give the tempo');
+      await p.evaluate((i) => window.actualRhythms.show(i), none);
+      check(await p.textContent('#tempoNum') === '74' && await p.$eval('#btnOrig', (b) => b.classList.contains('na')), 'no known tempo: slider tempo, button marked unavailable');
+      await p.evaluate((i) => window.actualRhythms.show(i), known);
+      await p.focus('#tempoSlider'); await p.keyboard.press('ArrowRight');
+      check(await p.getAttribute('#btnOrig', 'aria-pressed') === 'false', 'moving the slider should switch Original off');
+    }
     await p.click('#advanced summary');
     await p.click('#hideSource');
     check(await p.isVisible('#outcome .locked summary') && !(await p.isVisible('#outcome .source h3')), 'hidden source should show "Play to discover the music"');
@@ -379,6 +395,8 @@ async function performTaps(p, { lateMs = 0, skipFirst = 0 } = {}) {
         check(await p.evaluate(() => document.scrollingElement.scrollHeight <= document.scrollingElement.clientHeight + 1), 'page scrolls after results');
         check(await p.isVisible('.score-chip'), 'landscape: the score should show in the top line after an attempt');
         await p.screenshot({ path: path.join(OUT, 'locked-iphone-landscape-result.png') });
+        const up2 = await box(p, '#tempoValue'); const pd2 = await box(p, '#pad');
+        check(up2.x + up2.w <= pd2.x - 4, `after a result, tempo controls run under the Tap pad (${Math.round(up2.x + up2.w)} > ${Math.round(pd2.x)})`);
       }
       await p.screenshot({ path: path.join(OUT, `locked-${dev.replace(/ /g, '-')}-${bars}bars.png`) });
       check(errs.length === 0, 'page errors: ' + errs.join(' | '));

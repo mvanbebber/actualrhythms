@@ -9,7 +9,7 @@ A rhythm sight-reading trainer in the spirit of Rhythm Sight Reading Trainer, wi
 3. Tap each note's attack on the pad, or with Space / F / J.
 4. Each note is colored by timing (within 35 ms, within 75 ms, loose, missed); your taps appear as tick marks under the staff. You get a score, your average early/late tendency, and the source of the rhythm.
 
-Every excerpt plays twice (it's written with a repeat sign). **→ / N** loads the next rhythm and **←** goes back to earlier ones. **Listen** plays the original melody on a sampled grand piano. Each tap during an attempt plays a short click. **Calibrate** measures your device's audio/input delay (useful with Bluetooth headphones).
+Every excerpt plays twice (it's written with a repeat sign). **→ / N** loads the next rhythm and **←** goes back to earlier ones. **Listen** plays the original part on a sampled grand piano, or on sampled bass, guitar or drums when the excerpt comes from one of those parts. Each tap during an attempt plays a short click. **Calibrate** measures your device's audio/input delay (useful with Bluetooth headphones).
 
 ## Where the rhythms come from
 
@@ -97,6 +97,9 @@ To add your own music, drop MusicXML / ABC / kern files into a folder and add it
 - `data/rhythms.js` – generated rhythm corpus
 - `vendor/vexflow.js` – VexFlow 4.2.3 (MIT)
 - `audio/piano/` – Salamander Grand Piano V3 by Alexander Holm (CC BY 3.0), MP3 encoding from [@audio-samples](https://github.com/darosh/samples-piano-mp3) (MIT): velocity layers 6, 8, 10 and 13 plus key-release samples
+- `audio/instruments/` – acoustic, electric and synth bass and clean electric and steel-string guitar from the FluidR3 GM SoundFont by Frank Wen (CC BY 3.0), MP3 renderings from [midi-js-soundfonts](https://github.com/gleitz/midi-js-soundfonts), every minor third
+- `audio/drums/` – one hit each of kick, snare, two toms, hi-hat (closed and open), ride and crash from the [Versilian Community Sample Library](https://github.com/sgossner/VCSL) (CC0), trimmed and converted to MP3
+- `tools/instrument_offsets.py` – measures each bass, guitar and drum sample's onset and loudness
 - `tools/wjd.py` – jazz solo extraction
 - `tools/extra_sources.py` – Joplin edition and OpenEWLD loaders (with the US public-domain filter)
 - `tools/origins.py` – country of origin and dated label for every source

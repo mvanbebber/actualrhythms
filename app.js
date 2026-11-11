@@ -184,7 +184,7 @@
     renderOutcome();
     syncSettings();
     setButtons();
-    piano.prepare(pianoPitches()).catch(() => {}); // fetch the samples this excerpt needs in the background
+    prepareSound().catch(() => {}); // fetch the samples this excerpt needs in the background
   }
 
 
@@ -670,6 +670,10 @@
       return dctx;
     };
     let master = null;
+    const out = () => {
+      if (!master) { const c = audio(); master = c.createGain(); master.gain.value = 0.9; master.connect(c.destination); }
+      return master;
+    };
     const sampleFor = (midi) => {
       const m = Math.max(21, Math.min(108, midi));
       // nearest sampled key (samples are 3 semitones apart, so at most 1 semitone of shift)
@@ -700,11 +704,11 @@
     }
     function play(t, dur, midi, vel, gain = 1) {
       const c = audio();
-      if (!master) { master = c.createGain(); master.gain.value = 0.9; master.connect(c.destination); }
+      out();
       const u = urls(midi, vel);
       const gen = audioGen;
       load(u.note).then((buf) => {
-        if (gen !== audioGen || t < c.currentTime) return; // stopped meanwhile, or arrived too late // arrived too late (only if prepare() was skipped)
+        if (gen !== audioGen || t < c.currentTime) return; // stopped meanwhile, or arrived too late (only if prepare() was skipped)
         const [noteStart] = offsetOf(u.note);
         const src = c.createBufferSource(); const g = c.createGain();
         src.buffer = buf; src.playbackRate.value = u.rate;
@@ -721,8 +725,94 @@
         scheduled.push(src);
       }).catch(() => { /* a missing sample just stays silent */ });
     }
+    return { prepare, play, load, out };
+  })();
+
+  // Bass, guitar and drum parts play on their own instrument; every other part plays on the piano.
+  // Bass and guitar: FluidR3 GM (Frank Wen, CC BY 3.0), sampled every minor third. Drums: the
+  // Versilian Community Sample Library (CC0), one hit per kit piece.
+  const BASS_DIRS = { synth: 'synth_bass_1', electric: 'electric_bass_finger', acoustic: 'acoustic_bass' };
+  function instrumentOf(occ) {
+    if (!occ) return null;
+    const part = occ[1] || '';
+    const genre = genreOf(occ);
+    if (/bass drum|surdo/i.test(part)) return { kind: 'drums', kickOnly: true };
+    if (/drum/i.test(part)) return { kind: 'drums' };
+    // sung and orchestral bass lines (chorales, madrigals, classical) stay on the piano
+    if (/\bbass\b/i.test(part) && !/clarinet|drum/i.test(part) && genre !== 'chorale' && genre !== 'classical') {
+      const type = /synth/i.test(part) ? 'synth' : /electric/i.test(part) ? 'electric'
+        : /upright|acoustic|string/i.test(part) || genre === 'jazz' || genre === 'latin' ? 'acoustic' : 'electric';
+      return { kind: 'pitched', dir: BASS_DIRS[type], lo: 24, hi: 72 };
+    }
+    if (/guitar/i.test(part)) return { kind: 'pitched', dir: /acoustic/i.test(part) ? 'acoustic_guitar_steel' : 'electric_guitar_clean', lo: 36, hi: 96 };
+    return null;
+  }
+  const instruments = (() => {
+    const NAMES = { 0: 'C', 3: 'Eb', 6: 'Gb', 9: 'A' };
+    // a drum part's note -> kit piece, by its position on the percussion staff (standard drum-set
+    // notation: hi-hat pedal below the staff, kick in the bottom space, floor tom on the second space,
+    // time slashes on the middle line, snare on the third space, toms above it, ride on the top line,
+    // hi-hat above the staff, crash on the first ledger line)
+    const kitPiece = (m) => (!m ? 'snare' : m <= 61 ? 'kick' : m <= 63 ? 'hihat' : m <= 67 ? 'kick' : m <= 70 ? 'tom-low'
+      : m <= 73 ? 'snare' : m <= 76 ? 'tom' : m <= 78 ? 'ride' : m <= 80 ? 'hihat' : 'crash');
+    const KIT_MIX = { kick: 1, snare: 0.95, 'tom-low': 0.85, tom: 0.85, ride: 0.55, hihat: 0.5, 'hihat-open': 0.55, crash: 0.6 };
+    let OFF = { instruments: {}, drums: {} };
+    const ready = Promise.all(['instruments', 'drums'].map((k) => fetch(`audio/${k}/offsets.json`)
+      .then((r) => (r.ok ? r.json() : {})).then((j) => { OFF[k] = j; }).catch(() => {})));
+    function sample(inst, midi) {
+      if (inst.kind === 'drums') {
+        const piece = inst.kickOnly ? 'kick' : kitPiece(midi);
+        const o = OFF.drums[`${piece}.mp3`] || [0, 0.05, 0.3];
+        return { url: `audio/drums/${piece}.mp3`, rate: 1, start: o[0], gain: (KIT_MIX[piece] * 0.6) / o[2] };
+      }
+      let m = midi || 48;
+      while (m < inst.lo) m += 12; // written outside the sampled range: move by octaves
+      while (m > inst.hi) m -= 12;
+      let best = m;
+      for (let d = 0; d <= 2; d++) { if ((m - d) % 12 in NAMES && m - d >= inst.lo) { best = m - d; break; } if ((m + d) % 12 in NAMES && m + d <= inst.hi) { best = m + d; break; } }
+      const key = `${inst.dir}/${NAMES[best % 12]}${Math.floor(best / 12) - 1}.mp3`;
+      const o = OFF.instruments[key] || [0, 0.05, 0.3];
+      // about the piano's loudness, but never letting a peak clip
+      return { url: `audio/instruments/${key}`, rate: Math.pow(2, (m - best) / 12), start: o[0], gain: Math.min(0.16 / o[1], 0.8 / o[2]) };
+    }
+    async function prepare(inst, midis) {
+      await ready;
+      return Promise.all(midis.map((m) => piano.load(sample(inst, m).url)));
+    }
+    function play(inst, t, dur, midi, vel, gain = 1) {
+      const c = audio();
+      const dest = piano.out();
+      const gen = audioGen;
+      ready.then(() => {
+        const s = sample(inst, midi);
+        return piano.load(s.url).then((buf) => {
+          if (gen !== audioGen || t < c.currentTime) return;
+          const src = c.createBufferSource(); const g = c.createGain();
+          src.buffer = buf; src.playbackRate.value = s.rate;
+          const level = (0.75 + 0.35 * vel) * gain * s.gain;
+          g.gain.setValueAtTime(level, t);
+          if (inst.kind === 'drums') {
+            src.stop(t + buf.duration); // a drum rings out
+          } else {
+            const off = t + Math.max(0.06, dur);
+            g.gain.setValueAtTime(level, off);
+            g.gain.setTargetAtTime(0, off, 0.05); // the string is damped at the note's end
+            src.stop(off + 0.5);
+          }
+          src.connect(g).connect(dest);
+          src.start(t, s.start); // skip the sample's lead-in so the attack lands on the beat
+          scheduled.push(src);
+        });
+      }).catch(() => { /* a missing sample just stays silent */ });
+    }
     return { prepare, play };
   })();
+  // the excerpt's notes, on its own instrument when it has one
+  function prepareSound() {
+    const inst = current && instrumentOf(current.occ);
+    if (!inst) return piano.prepare(pianoPitches());
+    return instruments.prepare(inst, pianoPitches().map((n) => n.midi));
+  }
 
   // metric weight -> loudness. Each weight sits in the middle of one velocity layer
   // (downbeat, beat, half-beat, the rest), so the layer is fixed and can be preloaded;
@@ -780,7 +870,7 @@
     if (mode !== 'play') {
       const token = ++loadingToken;
       loadingMode = mode; setButtons();
-      try { await piano.prepare(pianoPitches()); } catch (e) { /* play what loaded */ }
+      try { await prepareSound(); } catch (e) { /* play what loaded */ }
       if (token !== loadingToken) return;
       loadingMode = null;
       if (run || phase !== 'idle') { setButtons(); return; }
@@ -824,9 +914,15 @@
   // voicing isn't louder than a single line
   const chordGain = (n) => (n > 1 ? Math.max(0.55, 1 / Math.sqrt(n)) : 1);
   function playChord(t, dur, midi, vel, fallback) {
+    const inst = instrumentOf(current.occ);
+    const note = (m, g) => (inst ? instruments.play(inst, t, dur, m, vel, g) : piano.play(t, dur, m, vel, g));
     const ms = notesOf(midi);
-    if (!ms.length) { if (fallback) piano.play(t, dur, fallback, vel); return; }
-    ms.forEach((m) => piano.play(t, dur, m, vel, chordGain(ms.length)));
+    if (!ms.length) { // no pitch known: a drum hit still sounds (as snare), anything else only on fallback
+      if (inst && inst.kind === 'drums') note(0, 1); else if (fallback) note(fallback, 1);
+      return;
+    }
+    // drum hits together (kick and cymbal) each sound at full strength
+    ms.forEach((m) => note(m, inst && inst.kind === 'drums' ? 1 : chordGain(ms.length)));
   }
 
   function soundingNotes() {
@@ -1126,7 +1222,7 @@
     $('btnCalib').disabled = phase !== 'idle';
     const melody = $('btnMelody');
     if (melody) {
-      melody.querySelector('span').textContent = loadingMode === 'melody' ? 'Loading piano…' : 'Hear the melody';
+      melody.querySelector('span').textContent = loadingMode === 'melody' ? 'Loading sound…' : 'Hear the melody';
       melody.disabled = phase === 'calibrating' || !!loadingMode;
     }
     showTempo();
@@ -1135,7 +1231,7 @@
     if (!running) {
       if (!current) setPadStatus('empty', 'No rhythms match these settings');
       else if (phase === 'calibrating') setPadStatus('calibrating', 'Calibrating: tap with the clicks');
-      else if (loadingMode) setPadStatus('loading', 'Loading piano…');
+      else if (loadingMode) setPadStatus('loading', 'Loading sound…');
       else setPadStatus(lastResult ? 'done' : 'ready', lastResult ? `Tap or press Start to try again · plays ${reps()}×` : `Press Start, or just start tapping · plays ${reps()}×`);
     }
   }

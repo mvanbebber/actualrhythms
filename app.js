@@ -730,7 +730,7 @@
 
   // Bass, guitar and drum parts play on their own instrument; every other part plays on the piano.
   // Bass and guitar: FluidR3 GM (Frank Wen, CC BY 3.0), sampled every minor third. Drums: the
-  // Versilian Community Sample Library (CC0), one hit per kit piece.
+  // Salamander Drumkit (Alexander Holm, CC BY-SA 3.0), one hit per kit piece.
   const BASS_DIRS = { synth: 'synth_bass_1', electric: 'electric_bass_finger', acoustic: 'acoustic_bass' };
   function instrumentOf(occ) {
     if (!occ) return null;
@@ -753,11 +753,11 @@
     // notation: hi-hat pedal below the staff, kick in the bottom space, floor tom on the second space,
     // medium tom on the middle line, snare on the third space, high toms above it, ride on the top line,
     // hi-hat above the staff, crash on the first ledger line)
-    const kitPiece = (m) => (!m ? 'snare' : m <= 61 ? 'kick' : m <= 63 ? 'hihat' : m <= 67 ? 'kick' : m <= 70 ? 'tom-low'
+    const kitPiece = (m) => (!m ? 'snare' : m <= 61 ? 'kick' : m <= 63 ? 'hihat-foot' : m <= 67 ? 'kick' : m <= 70 ? 'tom-low'
       : m === 71 ? 'tom-mid' : m <= 73 ? 'snare' : m <= 76 ? 'tom' : m <= 78 ? 'ride' : m <= 80 ? 'hihat' : 'crash');
     // the kit has two toms; the medium tom is the low one tuned up a minor third
     const KIT_FILE = { 'tom-mid': ['tom-low', Math.pow(2, 3 / 12)] };
-    const KIT_MIX = { kick: 1, snare: 0.95, 'tom-low': 0.85, 'tom-mid': 0.85, tom: 0.85, ride: 0.55, hihat: 0.5, 'hihat-open': 0.55, crash: 0.6 };
+    const KIT_MIX = { kick: 1, snare: 0.9, 'tom-low': 0.85, 'tom-mid': 0.85, tom: 0.85, ride: 0.8, hihat: 0.55, 'hihat-open': 0.55, 'hihat-foot': 0.45, crash: 0.6 };
     let OFF = { instruments: {}, drums: {} };
     const ready = Promise.all(['instruments', 'drums'].map((k) => fetch(`audio/${k}/offsets.json`)
       .then((r) => (r.ok ? r.json() : {})).then((j) => { OFF[k] = j; }).catch(() => {})));

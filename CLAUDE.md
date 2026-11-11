@@ -11,7 +11,7 @@
 ## Layout
 - Static site, no build step: `index.html`, `app.js`, `styles.css`, `vendor/vexflow.js`, `data/`.
 - Playback: piano (`audio/piano/`) for every part except bass, guitar and drum parts, which use
-  `audio/instruments/` (FluidR3 GM, CC BY 3.0) and `audio/drums/` (VCSL, CC0); see `instrumentOf()` in `app.js`.
+  `audio/instruments/` (FluidR3 GM, CC BY 3.0) and `audio/drums/` (Salamander Drumkit, CC BY-SA 3.0); see `instrumentOf()` in `app.js`.
   Run `tools/instrument_offsets.py` after changing those samples.
 - Landing pages: `why/`, `compare/`, `teachers/`, `jazz/`, sharing `landing/landing.css`; their notation
   images in `landing/img/` are real excerpts exported from the app.

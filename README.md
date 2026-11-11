@@ -98,7 +98,7 @@ To add your own music, drop MusicXML / ABC / kern files into a folder and add it
 - `vendor/vexflow.js` – VexFlow 4.2.3 (MIT)
 - `audio/piano/` – Salamander Grand Piano V3 by Alexander Holm (CC BY 3.0), MP3 encoding from [@audio-samples](https://github.com/darosh/samples-piano-mp3) (MIT): velocity layers 6, 8, 10 and 13 plus key-release samples
 - `audio/instruments/` – acoustic, electric and synth bass and clean electric and steel-string guitar from the FluidR3 GM SoundFont by Frank Wen (CC BY 3.0), MP3 renderings from [midi-js-soundfonts](https://github.com/gleitz/midi-js-soundfonts), every minor third
-- `audio/drums/` – one hit each of kick, snare, two toms, hi-hat (closed and open), ride and crash from the [Versilian Community Sample Library](https://github.com/sgossner/VCSL) (CC0), trimmed and converted to MP3
+- `audio/drums/` – one hit each of kick, snare, two toms, hi-hat (closed, open and pedal), ride and crash from the Salamander Drumkit by Alexander Holm (CC BY-SA 3.0; these trimmed MP3s are shared under the same license), from [Salamander-Drumkit-Trim](https://github.com/SoerenSofke/Salamander-Drumkit-Trim)
 - `tools/instrument_offsets.py` – measures each bass, guitar and drum sample's onset and loudness
 - `tools/wjd.py` – jazz solo extraction
 - `tools/extra_sources.py` – Joplin edition and OpenEWLD loaders (with the US public-domain filter)

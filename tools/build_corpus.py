@@ -58,6 +58,22 @@ COLLECTION_EXTRA = {
     'parkerbook': {'credit': 'transcribed by Michael Van Bebber', 'url': 'https://qpress.ca/product/60-melodies-solos-charlie-parker-omnibook'},
 }
 UNPITCHED_MIDI = 72
+
+
+def note_midis(n):
+    """Every pitch a note, chord or drum hit sounds. Drums (unpitched) take the pitch of their place on
+    the staff, so a kick and hi-hat struck together play as two notes, low and high."""
+    out = []
+    for x in (n.notes if hasattr(n, 'notes') and n.isChord else [n]):
+        p = getattr(x, 'pitch', None)
+        if p is not None and hasattr(p, 'midi'):
+            out.append(p.midi)
+        else:
+            try:
+                out.append(x.displayPitch().midi)  # unpitched: where it sits on the staff
+            except Exception:
+                pass
+    return out
 METERS = {'2/4', '3/4', '4/4', '2/2', '3/8', '6/8', '9/8', '12/8', '3/2', '6/4'}
 TYPE_CODE = {'whole': 'w', 'half': 'h', 'quarter': 'q', 'eighth': '8', '16th': '16', '32nd': '32'}
 FLAG_REST, FLAG_TIE, FLAG_TRIP, FLAG_TSTART, FLAG_TSTOP = 1, 2, 4, 8, 16
@@ -100,14 +116,8 @@ def event_of(n):
     else:
         if n.tie is not None and n.tie.type in ('start', 'continue'):
             flags |= FLAG_TIE
-        pitches = getattr(n, 'pitches', None) or ()
-        if n.isChord and pitches:
-            ps = sorted({p.midi for p in pitches})
-            midi = ps if len(ps) > 1 else ps[0]  # a chord keeps every note, for playback
-        elif getattr(n, 'pitch', None) is not None and hasattr(n.pitch, 'midi'):
-            midi = n.pitch.midi
-        else:
-            midi = UNPITCHED_MIDI  # drums: one note on the piano
+        ps = sorted(set(note_midis(n)))
+        midi = ps if len(ps) > 1 else (ps[0] if ps else UNPITCHED_MIDI)  # a chord keeps every note, for playback
     tie_in = (not n.isRest) and n.tie is not None and n.tie.type in ('stop', 'continue')
     return [int(ticks), code, flags, midi], tie_in
 
@@ -188,7 +198,7 @@ def measure_events(m, bar_ticks):
             i = starts.get(snap_ticks(n.offset))
             if i is None:
                 continue
-            extra = [p.midi for p in getattr(n, 'pitches', ()) if hasattr(p, 'midi')]
+            extra = note_midis(n)
             have = evs[i][3] if isinstance(evs[i][3], list) else [evs[i][3]]
             merged = sorted(set(have) | set(extra))
             evs[i][3] = merged if len(merged) > 1 else merged[0]
@@ -368,16 +378,26 @@ def process_mvb(path):
         c = mvb.credits(path, md.title if md else '', md.composer if md else '')
         tempo_at = score_tempos(s)
         parts = [p for p in s.parts if any(not n.isRest for n in p.recurse().notes)]
-        labels = mvb.staff_labels(parts, c)
-        out, seen = [], []
-        for part, label in zip(parts, labels):
-            # the same line in another transposition: same rhythm bar for bar
-            sig = []
+        # the same line in another transposition (a lead sheet in C, Eb and Bb, a doubled part): the same
+        # rhythm in the bars where either staff plays, with the same number of notes. Kept once.
+        kept, seen = [], []
+        for part in parts:
+            sig, count = [], 0
             for m in part.getElementsByClass('Measure'):
-                sig.append(tuple((n.quarterLength, n.isRest) for n in m.recurse().notesAndRests if n.quarterLength))
-            if any(sum(a == b for a, b in zip(sig, t)) >= 0.9 * max(len(sig), 1) for t in seen):
+                bar = tuple((n.quarterLength, n.isRest) for n in m.recurse().notesAndRests if n.quarterLength)
+                sig.append(bar if any(not r for _, r in bar) else None)
+                count += sum(1 for n in m.recurse().notes if n.quarterLength)
+            def same_line(other):
+                osig, ocount = other
+                played = [i for i in range(min(len(sig), len(osig))) if sig[i] or osig[i]]
+                return bool(played) and ocount == count and sum(sig[i] == osig[i] for i in played) >= 0.9 * len(played)
+            if any(same_line(o) for o in seen):
                 continue
-            seen.append(sig)
+            seen.append((sig, count))
+            kept.append(part)
+        labels = mvb.staff_labels(kept, c)  # labeled after duplicates are dropped
+        out = []
+        for part, label in zip(kept, labels):
             if part.getInstrument().transposition is not None:
                 try:
                     part = part.toSoundingPitch()

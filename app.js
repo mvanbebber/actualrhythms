@@ -694,7 +694,7 @@
     function prepare(notes) {
       return Promise.all([offsReady, ...notes.map(({ midi, vel }) => load(urls(midi, vel).note))]);
     }
-    function play(t, dur, midi, vel) {
+    function play(t, dur, midi, vel, gain = 1) {
       const c = audio();
       if (!master) { master = c.createGain(); master.gain.value = 0.9; master.connect(c.destination); }
       const u = urls(midi, vel);
@@ -704,7 +704,7 @@
         const [noteStart] = offsetOf(u.note);
         const src = c.createBufferSource(); const g = c.createGain();
         src.buffer = buf; src.playbackRate.value = u.rate;
-        const level = 0.75 + 0.35 * vel;
+        const level = (0.75 + 0.35 * vel) * gain;
         const off = t + Math.max(0.06, dur);
         g.gain.setValueAtTime(level, t);
         g.gain.setValueAtTime(level, off);
@@ -723,10 +723,12 @@
   // metric weight -> loudness. Each weight sits in the middle of one velocity layer
   // (downbeat, beat, half-beat, the rest), so the layer is fixed and can be preloaded;
   // humanize adds a little variation inside the layer.
+  // Every note at the same moderate strength (no built-in accents on downbeats or beats), with a
+  // touch of variation when humanized so a run doesn't sound mechanical. The value picks one sample
+  // layer for all notes, so the tone stays the same throughout.
+  const PLAY_VEL = 0.6;
   function velocityAt(pos, humanize) {
-    const mi = current.mi;
-    const base = pos % mi.bar === 0 ? 0.875 : pos % mi.beat === 0 ? 0.625 : pos % (mi.beat / 2) === 0 ? 0.375 : 0.125;
-    return humanize ? base + (Math.random() - 0.5) * 0.12 : base;
+    return humanize ? PLAY_VEL + (Math.random() - 0.5) * 0.06 : PLAY_VEL;
   }
   const LISTEN_MIDI = 72; // fallback pitch (C5) for a note whose pitch is unknown
   function pianoPitches() {
@@ -735,7 +737,7 @@
     soundingNotes().forEach((n) => {
       const vel = velocityAt(n.pos);
       const ms = notesOf(n.midi);
-      (ms.length ? ms : [LISTEN_MIDI]).forEach((midi) => out.push({ midi, vel: chordVel(vel, ms.length) }));
+      (ms.length ? ms : [LISTEN_MIDI]).forEach((midi) => out.push({ midi, vel }));
     });
     return out;
   }
@@ -814,12 +816,13 @@
     tick();
   }
 
-  // every note of a chord, a little softer each so a full voicing isn't louder than a single line
-  const chordVel = (vel, n) => (n > 1 ? vel * Math.max(0.55, 1 / Math.sqrt(n)) : vel);
+  // every note of a chord, each a little quieter (same sample layer, so the same tone) so a full
+  // voicing isn't louder than a single line
+  const chordGain = (n) => (n > 1 ? Math.max(0.55, 1 / Math.sqrt(n)) : 1);
   function playChord(t, dur, midi, vel, fallback) {
     const ms = notesOf(midi);
     if (!ms.length) { if (fallback) piano.play(t, dur, fallback, vel); return; }
-    ms.forEach((m) => piano.play(t, dur, m, chordVel(vel, ms.length)));
+    ms.forEach((m) => piano.play(t, dur, m, vel, chordGain(ms.length)));
   }
 
   function soundingNotes() {

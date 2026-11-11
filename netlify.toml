@@ -26,3 +26,28 @@
   to = "/404.html"
   status = 404
   force = true
+
+# actualrhythm.com (singular) is a domain alias: send every page to the same path on actualrhythms.com
+[[redirects]]
+  from = "https://actualrhythm.com/*"
+  to = "https://actualrhythms.com/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "http://actualrhythm.com/*"
+  to = "https://actualrhythms.com/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://www.actualrhythm.com/*"
+  to = "https://actualrhythms.com/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "http://www.actualrhythm.com/*"
+  to = "https://actualrhythms.com/:splat"
+  status = 301
+  force = true

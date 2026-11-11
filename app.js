@@ -650,7 +650,7 @@
     src.start(0); // as soon as possible
   }
   // Salamander Grand Piano V3 (Alexander Holm, CC BY 3.0): 4 of its 16 velocity layers,
-  // sampled every minor third from A0 to C8, plus per-key release (damper) sounds.
+  // sampled every minor third from A0 to C8 (the set's release noises are not used).
   const piano = (() => {
     const LAYERS = [6, 8, 10, 13];
     const NAMES = { 0: 'C', 3: 'Ds', 6: 'Fs', 9: 'A' };
@@ -685,25 +685,23 @@
     }
     const urls = (midi, vel) => {
       const s = sampleFor(midi);
-      const key = Math.max(1, Math.min(88, midi - 20));
-      return { note: `audio/piano/v${layerFor(vel)}/${s.name}.mp3`, rel: `audio/piano/release/rel${key}.mp3`, rate: s.rate };
+      return { note: `audio/piano/v${layerFor(vel)}/${s.name}.mp3`, rate: s.rate };
     };
     // where each sample's sound starts and how loud it peaks (tools/piano_offsets.py)
     let OFF = {};
     const offsReady = fetch('audio/piano/offsets.json').then((r) => (r.ok ? r.json() : {})).then((j) => { OFF = j; }).catch(() => {});
     const offsetOf = (url) => OFF[url.replace('audio/piano/', '')] || [0, 0.33];
     function prepare(notes) {
-      return Promise.all([offsReady, ...notes.flatMap(({ midi, vel }) => { const u = urls(midi, vel); return [load(u.note), load(u.rel)]; })]);
+      return Promise.all([offsReady, ...notes.map(({ midi, vel }) => load(urls(midi, vel).note))]);
     }
     function play(t, dur, midi, vel) {
       const c = audio();
       if (!master) { master = c.createGain(); master.gain.value = 0.9; master.connect(c.destination); }
       const u = urls(midi, vel);
       const gen = audioGen;
-      Promise.all([load(u.note), load(u.rel)]).then(([buf, rel]) => {
+      load(u.note).then((buf) => {
         if (gen !== audioGen || t < c.currentTime) return; // stopped meanwhile, or arrived too late // arrived too late (only if prepare() was skipped)
-        const [noteStart, notePeak] = offsetOf(u.note);
-        const [relStart, relPeak] = offsetOf(u.rel);
+        const [noteStart] = offsetOf(u.note);
         const src = c.createBufferSource(); const g = c.createGain();
         src.buffer = buf; src.playbackRate.value = u.rate;
         const level = 0.75 + 0.35 * vel;
@@ -714,13 +712,9 @@
         src.connect(g).connect(master);
         src.start(t, noteStart); // skip the sample's lead-in so the attack lands on the beat
         src.stop(off + 0.6);
-        // key mechanism noise, struck with the note and kept well under it (about 18 dB below its peak)
-        const rs = c.createBufferSource(); const rg = c.createGain();
-        rs.buffer = rel;
-        rg.gain.value = Math.min(1, (0.12 * notePeak * level) / Math.max(relPeak, 0.01));
-        rs.connect(rg).connect(master);
-        rs.start(t, relStart);
-        scheduled.push(src, rs);
+        // (the set's key-release noises aren't played: they aren't timed to the strike, and with chords
+        // several of them sounded as a late, loud thud)
+        scheduled.push(src);
       }).catch(() => { /* a missing sample just stays silent */ });
     }
     return { prepare, play };

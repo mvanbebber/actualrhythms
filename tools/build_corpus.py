@@ -91,6 +91,13 @@ def snap_ticks(ql):
     return Fraction(r) if abs(t - r) <= Fraction(1, 5) else t
 
 
+def tied(n, types):
+    """Is this note (or every note of this chord) tied this way? A chord with only some notes tied is
+    struck again: the others sound a new attack, so there's no tie in the rhythm."""
+    notes = list(n.notes) if n.isChord and len(n.notes) else [n]
+    return all(x.tie is not None and x.tie.type in types for x in notes)
+
+
 def event_of(n):
     """Return [ticks, code, flags, midi] for a note/chord/rest, or raise Skip."""
     d = n.duration
@@ -114,11 +121,11 @@ def event_of(n):
     if n.isRest:
         flags |= FLAG_REST
     else:
-        if n.tie is not None and n.tie.type in ('start', 'continue'):
+        if tied(n, ('start', 'continue')):
             flags |= FLAG_TIE
         ps = sorted(set(note_midis(n)))
         midi = ps if len(ps) > 1 else (ps[0] if ps else UNPITCHED_MIDI)  # a chord keeps every note, for playback
-    tie_in = (not n.isRest) and n.tie is not None and n.tie.type in ('stop', 'continue')
+    tie_in = (not n.isRest) and tied(n, ('stop', 'continue'))
     return [int(ticks), code, flags, midi], tie_in
 
 
@@ -193,7 +200,7 @@ def measure_events(m, bar_ticks):
         for n in v.notes:
             if n.duration.isGrace or n.quarterLength == 0:
                 continue
-            if n.tie is not None and n.tie.type in ('stop', 'continue'):
+            if tied(n, ('stop', 'continue')):
                 continue
             i = starts.get(snap_ticks(n.offset))
             if i is None:

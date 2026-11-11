@@ -846,6 +846,37 @@ def main():
     n_merged = sum(merge_beat_rests(w['meter'], w['measures']) for w in found if not w.get('fixed'))
     print(f'compound meters: {n_merged} beats of rest written as one dotted rest', file=sys.stderr)
 
+    # A triplet group that is one sound (every note tied into the next) or one silence (all rests) is
+    # written as a plain note or rest of the same length: a triplet eighth tied to a triplet sixteenth is
+    # just an eighth. The last note keeps its tie onward.
+    PLAIN = {TPQ // 8: '32', TPQ // 4: '16', TPQ * 3 // 8: '16d', TPQ // 2: '8', TPQ * 3 // 4: '8d',
+             TPQ: 'q', TPQ * 3 // 2: 'qd', TPQ * 2: 'h', TPQ * 3: 'hd', TPQ * 4: 'w'}
+    def plain_triplet_groups(measures):
+        changed = 0
+        for m in measures:
+            out, i = [], 0
+            while i < len(m):
+                if m[i][2] & FLAG_TSTART:
+                    j = i
+                    while not m[j][2] & FLAG_TSTOP:
+                        j += 1
+                    grp = m[i:j + 1]
+                    total = sum(e[0] for e in grp)
+                    rests = all(e[2] & FLAG_REST for e in grp)
+                    one_sound = not any(e[2] & FLAG_REST for e in grp) and all(e[2] & FLAG_TIE for e in grp[:-1])
+                    if len(grp) > 1 and total in PLAIN and (rests or one_sound):
+                        fl = FLAG_REST if rests else (grp[-1][2] & FLAG_TIE)
+                        out.append([total, PLAIN[total], fl] + grp[0][3:])
+                        changed += 1
+                        i = j + 1
+                        continue
+                out.append(m[i])
+                i += 1
+            m[:] = out
+        return changed
+    n_plain = sum(plain_triplet_groups(w['measures']) for w in found if not w.get('fixed'))
+    print(f'triplets: {n_plain} tied-through or silent triplet groups written as plain notes or rests', file=sys.stderr)
+
     # dedupe by rhythm (pitches ignored)
     uniq = {}
     sources = []

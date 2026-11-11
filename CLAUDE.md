@@ -13,7 +13,7 @@
 - Playback: piano (`audio/piano/`) for every part except bass, guitar and drum parts, which use
   `audio/instruments/` (FluidR3 GM, CC BY 3.0) and `audio/drums/` (Salamander Drumkit, CC BY-SA 3.0); see `instrumentOf()` in `app.js`.
   Run `tools/instrument_offsets.py` after changing those samples.
-- Landing pages: `why/`, `compare/`, `teachers/`, `jazz/`, sharing `landing/landing.css`; their notation
+- Landing pages: `why/`, `compare/`, `teachers/`, `jazz/`, `same-rhythm/`, sharing `landing/landing.css`; their notation
   images in `landing/img/` are real excerpts exported from the app.
 - Corpus build: `tools/build_corpus.py` writes `data/rhythms.js` and `data/occurrences.js` (loaded on demand)
   and stamps their versions. Sources: music21's corpus (cached in `tools/.windows-cache.pkl`), Joplin

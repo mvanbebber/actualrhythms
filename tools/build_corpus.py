@@ -643,7 +643,7 @@ def main():
     for p in corpus.getPaths():
         parts = str(p).split(os.sep)
         folder = next((f for f in COLLECTIONS if f in parts), None)
-        if folder:
+        if folder and not str(p).endswith('.rntxt'):  # RomanText files are harmonic analyses, not parts
             jobs.append((str(p), folder))
     # some pieces ship as both .krn and .mxl: keep the .mxl
     have = {os.path.splitext(j[0])[0] for j in jobs if j[0].endswith('.mxl')}
@@ -784,8 +784,11 @@ def main():
                  'monteverdi': 'Claudio Monteverdi', 'schumann_robert': 'Robert Schumann',
                  'schumann_clara': 'Clara Schumann', 'bach': 'J. S. Bach', 'liliuokalani': 'Liliʻuokalani',
                  'johnson_j_r': 'J. Rosamond Johnson'}
+    import monteverdi
     for w in found:
         s = w['src']
+        if s['folder'] == 'monteverdi':
+            monteverdi.fix(s)  # real titles, book, part and date (tools/monteverdi.py)
         m = re.match(r'^\S*_\S*\s*\((.+)\)$', s['title'])
         if m:
             s['title'] = m.group(1)

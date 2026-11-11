@@ -158,6 +158,7 @@ def credits(path, title_text, composer_text):
         f'tune by {tune_by}' if tune_by and tune_by.lower() not in subtitle.lower() else None,
     ) if x)
     return {'title': title, 'composer': performer, 'date': f'recorded {year}' if year else None, 'year': year,
+            'raw': ' '.join(T + C),
             'origin': None, 'note': note[:1].upper() + note[1:] if note else None,
             'folder': SONGS if stem in SONG_FILES else JAZZ, 'stem': stem}
 
@@ -172,7 +173,9 @@ def staff_labels(parts, cred):
         lab = raw[0]
         generic = lab in ('Part', 'Concert', 'Concert pitch', 'C', 'Bb', 'B flat', 'B flat part', 'Eb', 'Treble clef',
                           'Trumpet', 'Clarinet', 'Flute', 'Alto saxophone', 'Tenor saxophone', 'Trombone', '')
-        texts = ' '.join([cred.get('note') or '', cred['stem']]).lower()
+        texts = ' '.join([cred.get('note') or '', cred.get('raw') or '', cred['stem']]).lower()
+        if re.search(r'\b(moog|synth)\s*bass\b', texts):
+            return ['Synth bass']
         if 'solo' in texts:
             return ['Solo']
         if generic:

@@ -22,6 +22,11 @@ TRANSCRIBER_RE = re.compile(r'\b(trans(c|cribed|\.)?|arr\.?|arranged)\b', re.I)
 # the owner's own solos are left out (the corpus is transcriptions of other players)
 EXCLUDE_FILES = {'Green Dolphin Sendoff'}
 
+# staff names that don't say what the part is (file stem -> {label as built: correct label})
+PART_FIXES = {
+    'Golden Lady - Stevie Wonder': {'Synthesizer': 'Synth bass'},  # Stevie Wonder's Moog bass
+}
+
 # files whose recording is a song rather than jazz (soul, funk, pop, rock, blues, country)
 SONG_FILES = {
     'A Beautiful Life - Heartless Bastards', 'Africa - Toto', 'Another One - Mac DeMarco', "Autumn's Child",
@@ -164,6 +169,11 @@ def credits(path, title_text, composer_text):
 
 
 def staff_labels(parts, cred):
+    fix = PART_FIXES.get(cred['stem'], {})
+    return [fix.get(lab, lab) for lab in _staff_labels(parts, cred)]
+
+
+def _staff_labels(parts, cred):
     """One label per staff: the instrument ('Electric bass', 'Rhythm guitar', 'Drums', 'Vocal'), piano
     staves as right and left hand, repeated names numbered; a lone staff is 'Solo' or 'Melody' unless
     it names a rhythm-section instrument."""

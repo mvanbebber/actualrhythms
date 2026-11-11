@@ -37,7 +37,7 @@ img { max-width: 100%; display: block; }
 .site-head { border-bottom: 1px solid var(--border); background: var(--page); }
 .site-head .wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; padding-block: 14px; }
 .brand { font: 400 22px/1 var(--font-serif); color: var(--ink); text-decoration: none; margin-right: auto; display: flex; align-items: center; gap: 10px; }
-.brand img { width: 28px; height: 28px; border-radius: 6px; }
+.brand img { width: auto; height: 36px; }
 .site-nav { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 15px; }
 .site-nav a { color: var(--muted); text-decoration: none; padding: 6px 0; }
 .site-nav a:hover, .site-nav a[aria-current="page"] { color: var(--ink); }

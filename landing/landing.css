@@ -168,3 +168,9 @@ section.cta + section, section + section.cta { border-top: 0; }
 .players li { break-inside: avoid; padding: 3px 0; }
 
 @media (prefers-reduced-motion: no-preference) { .btn { transition: background-color 0.15s; } }
+
+/* Same rhythm page: one block per matched family */
+.pairs { display: grid; gap: 56px; }
+.pair { display: grid; gap: 18px; }
+.pair-head { display: grid; gap: 8px; max-width: 760px; }
+.pair-head p { color: var(--muted); }

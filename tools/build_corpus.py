@@ -480,41 +480,55 @@ def extract_part(part, pname, title, composer, folder):
 
 
 def windows_from_bars(bars, src):
-    """Cut a line's bars [(number, meter, events, tie_ins) or None] into 2- and 4-bar windows."""
-    out = []
+    """Cut a line's bars [(number, meter, events, tie_ins) or None] into 2- and 4-bar windows.
+
+    Windows start on the regular grid (bars 1-2, 3-4, ...; 1-4, 5-8, ...). Where a grid window can't be
+    used (it starts in the middle of a tie, the meter changes inside it, it sits next to an unreadable bar),
+    a window starting on any other bar is added if it takes in bars no window has yet, so a line tied over
+    its barlines isn't lost."""
+    def window(start, size):
+        win = bars[start:start + size]
+        if len(win) < size or any(b is None for b in win):
+            return None
+        msig = win[0][1]
+        if msig not in METERS or any(b[1] != msig for b in win):
+            return None
+        if win[0][3][0]:
+            return None  # starts mid-tie
+        # ties within window must land on a note
+        measures = [[list(e) for e in b[2]] for b in win]
+        flat = [e for mm in measures for e in mm]
+        tins = [t for b in win for t in b[3]]
+        for k, e in enumerate(flat):
+            if e[2] & FLAG_TIE:
+                if k + 1 >= len(flat):
+                    e[2] &= ~FLAG_TIE
+                elif not tins[k + 1] or (flat[k + 1][2] & FLAG_REST):
+                    e[2] &= ~FLAG_TIE
+            elif k + 1 < len(flat) and tins[k + 1] and not (flat[k + 1][2] & FLAG_REST):
+                return None  # dangling tie stop
+        onsets = sum(1 for k, e in enumerate(flat)
+                     if not e[2] & FLAG_REST and not (k and flat[k - 1][2] & FLAG_TIE))
+        if onsets < size * 1.5:
+            return None
+        return {'meter': msig, 'bars': size, 'measures': measures, 'src': dict(src, bar=win[0][0])}
+
+    out, covered = [], set()
     for size in (2, 4):
         for start in range(0, len(bars) - size + 1, size):
-            win = bars[start:start + size]
-            if any(b is None for b in win):
+            w = window(start, size)
+            if w:
+                out.append(w)
+                covered.update(range(start, start + size))
+    # off the grid: only where it reaches bars nothing covers yet
+    for size in (2, 4):
+        for start in range(len(bars) - size + 1):
+            if start % size == 0 or covered.issuperset(range(start, start + size)):
                 continue
-            msig = win[0][1]
-            if msig not in METERS or any(b[1] != msig for b in win):
-                continue
-            if win[0][3][0]:
-                continue  # starts mid-tie
-            # ties within window must land on a note
-            measures = [[list(e) for e in b[2]] for b in win]
-            flat = [e for mm in measures for e in mm]
-            tins = [t for b in win for t in b[3]]
-            ok = True
-            for k, e in enumerate(flat):
-                if e[2] & FLAG_TIE:
-                    if k + 1 >= len(flat):
-                        e[2] &= ~FLAG_TIE
-                    elif not tins[k + 1] or (flat[k + 1][2] & FLAG_REST):
-                        e[2] &= ~FLAG_TIE
-                elif k + 1 < len(flat) and tins[k + 1] and not (flat[k + 1][2] & FLAG_REST):
-                    ok = False  # dangling tie stop
-            if not ok:
-                continue
-            onsets = sum(1 for k, e in enumerate(flat)
-                         if not e[2] & FLAG_REST and not (k and flat[k - 1][2] & FLAG_TIE))
-            if onsets < size * 1.5:
-                continue
-            out.append({
-                'meter': msig, 'bars': size, 'measures': measures,
-                'src': dict(src, bar=win[0][0]),
-            })
+            w = window(start, size)
+            if w:
+                out.append(w)
+                covered.update(range(start, start + size))
     return out
 
 
@@ -876,6 +890,104 @@ def main():
         return changed
     n_plain = sum(plain_triplet_groups(w['measures']) for w in found if not w.get('fixed'))
     print(f'triplets: {n_plain} tied-through or silent triplet groups written as plain notes or rests', file=sys.stderr)
+
+    # A beat of sixteenth-note triplets is written as one group of eighth-note triplets, with one 3 over
+    # the beat: two half-beat groups that fill a beat become one, and a note that starts or ends between
+    # the triplet eighths and crosses one (a triplet quarter starting on the second sixteenth, say) is split
+    # there and tied, so each of the three triplet eighths can be seen. A note that starts and ends on them
+    # (sixteenth, sixteenth, quarter) and plain eighth-note triplets stay as they are.
+    T16, T8, BEAT = TPQ // 6, TPQ // 3, TPQ
+    TCODE = {T16 // 2: '32', T16: '16', T8: '8', T8 + T16: '8d', 2 * T8: 'q'}
+    def sixteenth_triplet_beats(measures):
+        changed = 0
+        for m in measures:
+            # groups as (start index, end index, start tick)
+            groups, pos, i = [], 0, 0
+            starts = []
+            for k, e in enumerate(m):
+                starts.append(pos)
+                pos += e[0]
+            k = 0
+            while k < len(m):
+                if m[k][2] & FLAG_TSTART:
+                    j = k
+                    while not m[j][2] & FLAG_TSTOP:
+                        j += 1
+                    groups.append([k, j])
+                    k = j + 1
+                else:
+                    k += 1
+            # 1. merge two half-beat groups that fill one beat
+            merged = []
+            for g in groups:
+                if merged:
+                    p0, p1 = merged[-1]
+                    a0, a1 = starts[p0], starts[p1] + m[p1][0]
+                    b0, b1 = starts[g[0]], starts[g[1]] + m[g[1]][0]
+                    if a0 % BEAT == 0 and a1 - a0 == BEAT // 2 and b0 == a1 and b1 - b0 == BEAT // 2 and p1 + 1 == g[0]:
+                        m[p1][2] &= ~FLAG_TSTOP
+                        m[g[0]][2] &= ~FLAG_TSTART
+                        merged[-1] = [p0, g[1]]
+                        changed += 1
+                        continue
+                merged.append(g)
+            # 2. in a one-beat group with sixteenth-level notes, split notes across the triplet-eighth lines
+            out, k = [], 0
+            gi = {g[0]: g for g in merged}
+            while k < len(m):
+                g = gi.get(k)
+                if not g:
+                    out.append(m[k]); k += 1; continue
+                g0, g1 = g
+                beg = starts[g0]
+                grp = m[g0:g1 + 1]
+                if beg % BEAT or sum(e[0] for e in grp) != BEAT:
+                    out.extend(grp); k = g1 + 1; continue
+                pieces, at = [], 0
+                for e in grp:
+                    a, end = at, at + e[0]
+                    # only a note that starts or ends between the triplet eighths hides them
+                    cuts = [c for c in (T8, 2 * T8) if a < c < end] if (a % T8 or end % T8) else []
+                    if not cuts:
+                        pieces.append(list(e))
+                    else:
+                        bounds = [a] + cuts + [end]
+                        for q in range(len(bounds) - 1):
+                            ln = bounds[q + 1] - bounds[q]
+                            fl = FLAG_TRIP | (e[2] & FLAG_REST)
+                            if not e[2] & FLAG_REST:
+                                fl |= FLAG_TIE if q < len(bounds) - 2 else (e[2] & FLAG_TIE)
+                            pieces.append([ln, TCODE.get(ln), fl] + list(e[3:]))
+                        changed += 1
+                    at = end
+                if any(pc[1] is None for pc in pieces):
+                    out.extend(grp); k = g1 + 1; continue
+                # 3. a note tied to the next inside one triplet eighth (or one triplet quarter starting on
+                # a triplet eighth) is one note, sixteenth tied to sixteenth is an eighth; two rests there are one rest
+                at, q = 0, 0
+                while q + 1 < len(pieces):
+                    x, y = pieces[q], pieces[q + 1]
+                    ln = x[0] + y[0]
+                    tied_pair = x[2] & FLAG_TIE and not (x[2] | y[2]) & FLAG_REST
+                    rest_pair = x[2] & y[2] & FLAG_REST
+                    if (tied_pair or rest_pair) and at % T8 == 0 and ln in (T8, 2 * T8) and ln < BEAT:
+                        fl = FLAG_TRIP | (FLAG_REST if rest_pair else y[2] & FLAG_TIE)
+                        pieces[q] = [ln, TCODE[ln], fl] + list(x[3:])
+                        del pieces[q + 1]
+                        changed += 1
+                        continue
+                    at += x[0]
+                    q += 1
+                for pc in pieces:
+                    pc[2] &= ~(FLAG_TSTART | FLAG_TSTOP)
+                pieces[0][2] |= FLAG_TSTART
+                pieces[-1][2] |= FLAG_TSTOP
+                out.extend(pieces)
+                k = g1 + 1
+            m[:] = out
+        return changed
+    n_beats = sum(sixteenth_triplet_beats(w['measures']) for w in found if not w.get('fixed'))
+    print(f'triplets: {n_beats} sixteenth-triplet beats regrouped under one 3 or split at the triplet eighths', file=sys.stderr)
 
     # dedupe by rhythm (pitches ignored)
     uniq = {}

@@ -376,7 +376,13 @@
         const m0 = mIdx * mi.bar;
         const pts = meas.map((e, i) => [evs[i].pos, (notes[i].getNoteHeadBeginX() + notes[i].getNoteHeadEndX()) / 2]);
         pts.push([m0 + mi.bar, x + w - (last ? 18 : 6)]);
-        rowInfo.segs.push({ t0: m0, t1: m0 + mi.bar, pts });
+        // the playhead's own map: it moves in time with the music, reaching the barline exactly on the
+        // next downbeat (never sliding across it early), and a whole-bar rest drawn in the middle of
+        // the bar counts from the bar's start
+        const startX = notes[0].getStave().getNoteStartX();
+        const ppts = meas.map((e, i) => [evs[i].pos, evs[i].rest && meas.length === 1 ? startX : pts[i][1]]);
+        ppts.push([m0 + mi.bar, x + w - (last ? 8 : 0.5)]);
+        rowInfo.segs.push({ t0: m0, t1: m0 + mi.bar, pts, ppts });
         x += w;
       });
       // within a row, a bar's end point leads into the next bar's first note (not the barline),
@@ -399,14 +405,14 @@
     if (lastResult) drawTapMarks();
   }
 
-  function tickToXY(tick) {
+  function tickToXY(tick, playhead) {
     if (!layout) return null;
     const lastT = current.flat.total;
     for (const row of layout.rows) {
       for (const sg of row.segs) {
         // a bar owns [start, end); only the final barline owns its end tick
         if (tick >= sg.t0 && (tick < sg.t1 || (tick === sg.t1 && sg.t1 === lastT))) {
-          const p = sg.pts;
+          const p = playhead ? sg.ppts : sg.pts;
           for (let i = 0; i < p.length - 1; i++) {
             if (tick >= p[i][0] && tick <= p[i + 1][0]) {
               const f = p[i + 1][0] === p[i][0] ? 0 : (tick - p[i][0]) / (p[i + 1][0] - p[i][0]);
@@ -941,10 +947,25 @@
     return out;
   }
 
+  // The audio time being heard right now. The audio clock moves in coarse steps in some browsers,
+  // which made the playhead jump; the output timestamp ties it to the display clock instead.
+  function heardTime(c) {
+    let t = c.currentTime - (c.outputLatency || 0);
+    if (c.getOutputTimestamp) {
+      const ts = c.getOutputTimestamp();
+      const age = performance.now() - ts.performanceTime;
+      // the same clock taps are timed by (eventAudioTime); a stale timestamp is ignored
+      if (ts.contextTime > 0 && ts.performanceTime > 0 && age >= 0 && age < 500) t = ts.contextTime + age / 1000;
+    }
+    if (run.lastHeard != null && t < run.lastHeard) t = run.lastHeard; // never step backward
+    run.lastHeard = t;
+    return t;
+  }
+
   function tick() {
     if (!run) return;
     const c = audio();
-    const now = c.currentTime - (c.outputLatency || 0);
+    const now = heardTime(c);
     const ph = $('playhead'); const ci = $('countin');
     if (now < run.t0) {
       const b = Math.floor((now - run.start) / run.beatSec);
@@ -961,7 +982,7 @@
       const pass = Math.min(R - 1, Math.floor(tk / total));
       if (run.mode === 'play') setPadStatus('playing', R === 2 ? (pass === 0 ? 'Tap each note · first time' : 'Tap each note · repeat') : `Tap each note · ${pass + 1} of ${R}`);
       else setPadStatus('listening', 'Playing the melody · taps are not scored');
-      const p = tickToXY(tk >= total * R ? total : tk % total);
+      const p = tickToXY(tk >= total * R ? total : tk % total, true);
       if (p && layout) {
         ph.hidden = false;
         ph.style.left = (p.x * layout.s) + 'px';

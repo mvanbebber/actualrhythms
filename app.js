@@ -1097,6 +1097,44 @@
   const icon = (id, cls) => `<svg class="icon${cls ? ' ' + cls : ''}" aria-hidden="true"><use href="#i-${id}"/></svg>`;
 
   // collections whose name adds nothing beyond the song's own origin
+  // ---------- favorites: excerpts starred to play or practice later (kept in this browser) ----------
+  // Each is saved by piece, part, first bar and rhythm, not by its place in the data, so a favorite
+  // survives a rebuild of the corpus. Newest first.
+  let favorites = store.get('favorites', []).filter((f) => f && f.r);
+  const rhythmKey = (item) => `${item.m}|${item.r.join(' / ')}`;
+  function favOf(item, occ) {
+    const s = DATA.sources[occ[0]];
+    return { t: s[0], c: s[1] || '', f: s[2], p: occ[1] || '', b: occ[2] == null ? null : occ[2], r: rhythmKey(item) };
+  }
+  const sameFav = (a, b) => a.r === b.r && a.t === b.t && a.c === b.c && a.f === b.f && a.p === b.p && a.b === b.b;
+  const isFavorite = (item, occ) => { const k = favOf(item, occ); return favorites.some((f) => sameFav(f, k)); };
+  function toggleFavorite() {
+    if (!current) return;
+    const k = favOf(current.item, current.occ);
+    const had = favorites.some((f) => sameFav(f, k));
+    favorites = had ? favorites.filter((f) => !sameFav(f, k)) : [{ ...k, at: Date.now() }, ...favorites];
+    store.set('favorites', favorites);
+    renderOutcome();
+    const star = document.querySelector('#outcome .star');
+    if (star) star.focus({ preventScroll: true });
+  }
+  // the favorites as corpus rows ({item, occ}), newest first; one that is no longer in the corpus is skipped
+  function favoriteRows() {
+    const byRhythm = new Map();
+    favorites.forEach((f, i) => { if (!byRhythm.has(f.r)) byRhythm.set(f.r, []); byRhythm.get(f.r).push([f, i]); });
+    const rows = [];
+    DATA.rhythms.forEach((item) => {
+      const want = byRhythm.get(rhythmKey(item));
+      if (!want) return;
+      allOccurrences(item).forEach((occ) => {
+        const k = favOf(item, occ);
+        const hit = want.find(([f]) => sameFav(f, k));
+        if (hit && !rows.some((r) => r.i === hit[1])) rows.push({ item, occ, i: hit[1] });
+      });
+    });
+    return rows.sort((a, b) => a.i - b.i);
+  }
+
   const HIDE_COLLECTION = new Set(['essenFolksong']);
   function sourceInner() {
     const { item, occ } = current;
@@ -1130,14 +1168,17 @@
     const occurs = item.n > 1 || alt.n
       ? seeAll(`This rhythm is in ${item.n} piece${item.n === 1 ? '' : 's'} in the corpus${altText}. See them all`)
       : 'This rhythm is unique to one piece in the corpus.';
+    const fav = isFavorite(item, occ);
+    const star = `<button type="button" class="star" data-action="favorite" aria-pressed="${fav}" aria-label="${fav ? 'Remove from favorites' : 'Save to favorites'}" title="${fav ? 'Remove from favorites' : 'Save to favorites, to play or practice later'}">${icon(fav ? 'star-fill' : 'star')}</button>`;
     return `<div class="source">
-      <div class="eyebrow">Where this rhythm comes from</div>
+      <div class="source-top"><div class="eyebrow">Where this rhythm comes from</div>${star}</div>
       <h3>${esc(title)}${composer ? ` <em>${esc(composer)}</em>` : ''}</h3>
       ${where ? `<p class="where">${where}</p>` : ''}
       <p>${[part.replace(/, $/, ''), bars].filter(Boolean).join(', ')}${from}${note ? ` · ${esc(note)}` : ''}</p>
       ${tempoLine}<p>${occurs}</p>
       ${others ? `<div class="eyebrow">Also found in</div><ul>${others}</ul>` : ''}
       <button type="button" class="link-btn" data-action="corpus">Browse every rhythm in the corpus</button>
+      ${favorites.length ? `<button type="button" class="link-btn" data-action="favorites">Your favorites (${favorites.length})</button>` : ''}
     </div>`;
   }
 
@@ -1647,6 +1688,18 @@
       </div>`;
   }
 
+  function favRowHTML({ item, occ }) {
+    const src = DATA.sources[occ[0]];
+    const where = [src[3], src[4]].filter(Boolean).join(' · ');
+    const bars = occ[2] != null ? `mm. ${occ[2]}–${occ[2] + item.b - 1}` : '';
+    const part = occ[1] && !/^(musicxml part|part\s*\d*|p\d+|instrument\s*\d*)$/i.test(occ[1].trim()) ? occ[1] : '';
+    return `<div class="c-thumb" style="height:${thumbHeight(item, thumbW)}px">${thumbSVG(item, thumbW)}</div>
+      <div class="c-meta">
+        <span class="c-chips"><span class="chip">${item.m}</span><span class="chip">Level ${item.l}</span><span class="chip">${item.b} bar${item.b > 1 ? 's' : ''}</span><span class="c-n c-fav">${icon('star-fill')}Favorite</span></span>
+        <span class="c-src"><b>${esc(src[0])}</b>${src[1] ? ' · ' + esc(src[1]) : ''}${part ? ' · ' + esc(part) : ''}${bars ? ' · ' + bars : ''}${where ? ' · ' + esc(where) : ''}</span>
+      </div>`;
+  }
+
   function familyRowHTML({ item, occ }) {
     const src = DATA.sources[occ[0]];
     const where = [src[3], src[4]].filter(Boolean).join(' · ');
@@ -1724,16 +1777,47 @@
       el.type = 'button'; el.className = 'c-row'; el.dataset.i = i;
       el.style.top = corpusTops[i] + 'px';
       el.style.height = (corpusTops[i + 1] - corpusTops[i]) + 'px';
-      el.innerHTML = corpusFamily ? familyRowHTML(corpusList[i]) : corpusRowHTML(corpusList[i]);
+      el.innerHTML = corpusFamily ? familyRowHTML(corpusList[i]) : corpusFavs ? favRowHTML(corpusList[i]) : corpusRowHTML(corpusList[i]);
       el.setAttribute('aria-label', `Practice: ${el.textContent.replace(/\s+/g, ' ').trim()}`);
       $('corpusSpacer').appendChild(el);
       rowEls.set(i, el);
     }
   }
 
+  function refreshFavorites() {
+    const q = $('corpusSearch').value.trim().toLowerCase();
+    let rows = favoriteRows();
+    if (q) {
+      const terms = q.split(/\s+/);
+      rows = rows.filter((r) => {
+        const src = DATA.sources[r.occ[0]];
+        const hay = [src[0], src[1], src[3], src[4], src[5], DATA.collections[src[2]].label, r.occ[1], r.item.m].join(' ').toLowerCase();
+        return terms.every((t) => hay.includes(t));
+      });
+    }
+    corpusList = rows;
+    $('corpusCount').textContent = `${rows.length.toLocaleString()} favorite${rows.length === 1 ? '' : 's'}`
+      + (q ? ` for “${$('corpusSearch').value.trim()}”` : '') + ' · tap one to play or practice it';
+    layoutCorpus();
+    $('corpusSpacer').querySelectorAll('.c-empty').forEach((e) => e.remove());
+    if (!rows.length) {
+      $('corpusSpacer').insertAdjacentHTML('beforeend', favorites.length && q
+        ? '<p class="c-empty">No favorites match that search.</p>'
+        : '<p class="c-empty">No favorites yet. Tap the star on a rhythm\'s source card to save it here, then come back to play or practice it.</p>');
+    }
+    rowEls.forEach((el) => el.remove()); rowEls.clear();
+    $('corpusScroll').scrollTop = 0;
+    renderCorpusRows();
+  }
+
   function refreshCorpus() {
     $('corpus').classList.toggle('family-mode', !!corpusFamily);
+    $('corpus').classList.toggle('fav-mode', corpusFavs && !corpusFamily);
+    $('corpusFav').setAttribute('aria-pressed', String(corpusFavs && !corpusFamily));
+    $('corpusTitle').textContent = corpusFavs && !corpusFamily ? 'Your favorites' : 'The corpus';
+    $('corpusFav').innerHTML = `${icon(corpusFavs && !corpusFamily ? 'star-fill' : 'star')}Favorites${favorites.length ? ` (${favorites.length})` : ''}`;
     if (corpusFamily) return refreshFamily();
+    if (corpusFavs) { $('corpusFamilyBar').hidden = true; return refreshFavorites(); }
     $('corpusFamilyBar').hidden = true;
     const q = $('corpusSearch').value.trim().toLowerCase();
     const only = $('corpusOnly').getAttribute('aria-checked') === 'true';
@@ -1802,10 +1886,18 @@
 
   // the corpus browser showing one rhythm family: a row for every passage, the asked-for spelling first
   let corpusFamily = null;
+  let corpusFavs = false; // the corpus browser showing the favorites
+  async function openFavorites() {
+    const opener = document.activeElement;
+    try { await loadOccurrences(); } catch (e) { /* show the favorites we can find */ }
+    corpusFamily = null; corpusFavs = true;
+    $('corpusSearch').value = '';
+    if (corpusOpen) refreshCorpus(); else { openCorpus(false); corpusOpener = opener; }
+  }
   async function openFamily(item) {
     const opener = document.activeElement;
     try { await loadOccurrences(); } catch (e) { /* show the sources we have */ }
-    corpusFamily = item;
+    corpusFamily = item; corpusFavs = false;
     openCorpus(false);
     corpusOpener = opener;
   }
@@ -1838,6 +1930,7 @@
     if (!corpusOpen) return;
     corpusOpen = false;
     corpusFamily = null;
+    corpusFavs = false;
     $('corpus').hidden = true;
     document.querySelector('.app').inert = false;
     rowEls.forEach((el) => el.remove()); rowEls.clear();
@@ -1864,6 +1957,11 @@
     });
     $('corpusClose').addEventListener('click', closeCorpus);
     $('corpusWhole').addEventListener('click', () => { corpusFamily = null; $('corpusSearch').value = ''; refreshCorpus(); $('corpusSearch').focus(); });
+    $('corpusFav').addEventListener('click', async () => {
+      if (corpusFavs && !corpusFamily) { corpusFavs = false; refreshCorpus(); return; }
+      try { await loadOccurrences(); } catch (e) { /* show the favorites we can find */ }
+      corpusFamily = null; corpusFavs = true; refreshCorpus();
+    });
     $('corpus').addEventListener('click', (e) => { if (e.target === $('corpus')) closeCorpus(); }); // backdrop
     let raf = 0;
     $('corpusScroll').addEventListener('scroll', () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(renderCorpusRows); }, { passive: true });
@@ -1897,6 +1995,8 @@
       const a = e.target.closest && e.target.closest('[data-action]');
       if (!a) return;
       if (a.dataset.action === 'melody') startRun('melody');
+      if (a.dataset.action === 'favorite') toggleFavorite();
+      if (a.dataset.action === 'favorites') openFavorites();
       if (a.dataset.action === 'settings') openSettings();
       if (a.dataset.action === 'corpus') openCorpus(false);
       if (a.dataset.action === 'family' && current) openFamily(current.item);

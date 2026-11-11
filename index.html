@@ -28,7 +28,7 @@
   // touch devices (phones, iPads, including iPads with a keyboard or trackpad) get the locked, no-scroll page
   if (navigator.maxTouchPoints > 0 || 'ontouchstart' in window) document.documentElement.dataset.touch = '';
 </script>
-<link rel="stylesheet" href="styles.css?v=37">
+<link rel="stylesheet" href="styles.css?v=38">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
@@ -40,6 +40,8 @@
     <symbol id="i-minus" viewBox="0 0 24 24"><path d="M6 12h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M6 12h12M12 6v12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
     <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="15" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="12" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="17" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-star-fill" viewBox="0 0 24 24"><path d="M12 3.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
     <symbol id="i-close" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
     <symbol id="i-tap" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
     <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5.5" y="10.5" width="13" height="9.5" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
@@ -215,6 +217,7 @@
         <option value="hard">Hardest first</option>
         <option value="title">Title A–Z</option>
       </select>
+      <button class="fav-toggle" id="corpusFav" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-star"/></svg>Favorites</button>
       <div class="switch-row corpus-only">
         <span id="corpusOnlyLabel">Only rhythms matching my settings</span>
         <button class="switch" id="corpusOnly" type="button" role="switch" aria-checked="false" aria-labelledby="corpusOnlyLabel"></button>
@@ -231,6 +234,6 @@
 
 <script src="vendor/vexflow.js"></script>
 <script src="data/rhythms.js?v=ec72208a99"></script>
-<script src="app.js?v=48"></script>
+<script src="app.js?v=49"></script>
 </body>
 </html>

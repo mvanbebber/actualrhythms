@@ -9,7 +9,7 @@ A rhythm sight-reading trainer in the spirit of Rhythm Sight Reading Trainer, wi
 3. Tap each note's attack on the pad, or with Space / F / J.
 4. Each note is colored by timing (within 35 ms, within 75 ms, loose, missed); your taps appear as tick marks under the staff. You get a score, your average early/late tendency, and the source of the rhythm.
 
-Every excerpt plays twice (it's written with a repeat sign). **→ / N** loads the next rhythm and **←** goes back to earlier ones. **Listen** plays the original part on a sampled grand piano, or on sampled bass, guitar or drums when the excerpt comes from one of those parts. Each tap during an attempt plays a short click. **Calibrate** measures your device's audio/input delay (useful with Bluetooth headphones).
+Every excerpt plays twice (it's written with a repeat sign). **→ / N** loads the next rhythm and **←** goes back to earlier ones. The star on the source card saves an excerpt to **Favorites** (kept in your browser), listed in the corpus browser to play or practice later. **Listen** plays the original part on a sampled grand piano, or on sampled bass, guitar or drums when the excerpt comes from one of those parts. Each tap during an attempt plays a short click. **Calibrate** measures your device's audio/input delay (useful with Bluetooth headphones).
 
 ## Where the rhythms come from
 

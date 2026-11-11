@@ -20,6 +20,8 @@
   --good: #2563A8;
   --off: #B5600B;
   --miss: #B42318;
+  --star: #B7791F;
+  --star-pale: #FBF1DE;
 
   --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px;
   --radius: 10px;
@@ -562,3 +564,24 @@ html[data-layout="phone"] .pool-note, html[data-layout="phone-landscape"] .pool-
   html[data-layout="phone"] .tempo-beat { display: none; }
   html[data-layout="phone"] .tempo-orig { padding: 0 8px; font-size: 12px; }
 }
+
+/* favorites: the star on the source card, and the corpus browser's Favorites view */
+.source-top { display: flex; align-items: center; justify-content: space-between; gap: var(--s2); margin: -6px -6px 0 0; }
+.star {
+  flex: none; width: 44px; height: 44px; display: grid; place-items: center; padding: 0;
+  border: 1px solid transparent; border-radius: 50%; background: none; color: var(--muted); cursor: pointer;
+}
+.star .icon { width: 24px; height: 24px; }
+.star:hover { color: var(--star); background: var(--star-pale); }
+.star[aria-pressed="true"] { color: var(--star); }
+.star:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.fav-toggle {
+  display: inline-flex; align-items: center; gap: 6px; min-height: var(--control-h); padding: 0 var(--s3);
+  border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface);
+  color: var(--ink); font: inherit; font-size: 15px; font-weight: 500; cursor: pointer;
+}
+.fav-toggle .icon { width: 18px; height: 18px; color: var(--star); }
+.fav-toggle[aria-pressed="true"] { background: var(--star-pale); border-color: var(--star); }
+.corpus.fav-mode #corpusSort, .corpus.fav-mode .corpus-only { display: none; }
+.c-fav { display: inline-flex; align-items: center; gap: 4px; color: var(--star); }
+.c-fav .icon { width: 14px; height: 14px; }

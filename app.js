@@ -116,7 +116,12 @@
     }
     return item._r;
   }
-  function pitchesOf(occ) { return occ[3].map((s) => (s.match(/../g) || []).map((h) => parseInt(h, 16))).flat(); }
+  // one entry per event: a MIDI number, or an array of them for a chord ('3c(3c4043)' -> [60, [60, 64, 67]])
+  function pitchesOf(occ) {
+    return occ[3].map((s) => (s.match(/\([0-9a-f]+\)|[0-9a-f]{2}/g) || []).map((h) => (h[0] === '('
+      ? h.slice(1, -1).match(/../g).map((x) => parseInt(x, 16)) : parseInt(h, 16)))).flat();
+  }
+  const notesOf = (midi) => (Array.isArray(midi) ? midi : midi ? [midi] : []);
 
   // flatten an item into events with absolute tick positions
   function flatten(item) {
@@ -735,7 +740,8 @@
     const out = [];
     soundingNotes().forEach((n) => {
       const vel = velocityAt(n.pos);
-      out.push({ midi: n.midi || LISTEN_MIDI, vel });
+      const ms = notesOf(n.midi);
+      (ms.length ? ms : [LISTEN_MIDI]).forEach((midi) => out.push({ midi, vel: chordVel(vel, ms.length) }));
     });
     return out;
   }
@@ -802,16 +808,24 @@
     if (mode === 'play' && S.metro) for (let b = 0; b < nBeats; b++) click(t0 + b * beatSec, (b * mi.beat) % mi.bar === 0, true);
     if (mode === 'listen') {
       if (S.metro) for (let b = 0; b < nBeats; b++) click(t0 + b * beatSec, (b * mi.beat) % mi.bar === 0, true);
-      passes((n, t) => piano.play(t, n.len * spt, n.midi || LISTEN_MIDI, velocityAt(n.pos, true))); // the real melody
+      passes((n, t) => playChord(t, n.len * spt, n.midi, velocityAt(n.pos, true), LISTEN_MIDI)); // the real part, chords and all
     }
     if (mode === 'melody') {
-      passes((n, t) => { if (n.midi) piano.play(t, n.len * spt, n.midi, velocityAt(n.pos, true)); });
+      passes((n, t) => playChord(t, n.len * spt, n.midi, velocityAt(n.pos, true), 0));
     }
     run = { mode, start, t0, spt, beatSec, countBeats, taps: [], endAt: t0 + total * R * spt + (mode === 'play' ? beatSec * 0.75 : 0.1) };
     phase = 'countin';
     if (mode === 'play' && lastResult) { lastResult = null; render(); renderOutcome(); }
     setButtons();
     tick();
+  }
+
+  // every note of a chord, a little softer each so a full voicing isn't louder than a single line
+  const chordVel = (vel, n) => (n > 1 ? vel * Math.max(0.55, 1 / Math.sqrt(n)) : vel);
+  function playChord(t, dur, midi, vel, fallback) {
+    const ms = notesOf(midi);
+    if (!ms.length) { if (fallback) piano.play(t, dur, fallback, vel); return; }
+    ms.forEach((m) => piano.play(t, dur, m, chordVel(vel, ms.length)));
   }
 
   function soundingNotes() {

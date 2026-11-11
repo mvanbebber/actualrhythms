@@ -19,6 +19,9 @@ import re
 JAZZ, SONGS = 'mvbjazz', 'mvbsongs'
 TRANSCRIBER_RE = re.compile(r'\b(trans(c|cribed|\.)?|arr\.?|arranged)\b', re.I)
 
+# the owner's own solos are left out (the corpus is transcriptions of other players)
+EXCLUDE_FILES = {'Green Dolphin Sendoff'}
+
 # files whose recording is a song rather than jazz (soul, funk, pop, rock, blues, country)
 SONG_FILES = {
     'A Beautiful Life - Heartless Bastards', 'Africa - Toto', 'Another One - Mac DeMarco', "Autumn's Child",
@@ -31,13 +34,12 @@ SONG_FILES = {
     'The Sky is Crying - Albert King', 'Things We Like To Do - Shuggie Otis', 'Use me up',
     'Walking On A Dream - Empire of the Sun', "We've Only Just Begun - Carpenters",
     'What a Fool Believes - The Doobie Brothers', 'White Gloves - Khruangbin (Live)', "Who's That Lady",
-    'Wild, Wicked and the Tame',
+    'Wild, Wicked and the Tame', 'After the Love',
 }
 
 # title blocks that are missing, or copied from another score
 OVERRIDES = {
     'Dig': {'title': 'Dig', 'performer': '', 'tune_by': 'Miles Davis', 'subtitle': ''},
-    'After the Love': {'title': 'After the Love'},
     "Easin' It": {'title': "Easin' It", 'subtitle': 'Intro'},
     'One O Clock Jump from Kansas City 5': {'performer': 'Kansas City 5', 'tune_by': 'Count Basie'},
     'Show-Type Tune (Bill Evans Solo)': {'performer': 'Bill Evans', 'tune_by': 'Lee Konitz'},
@@ -63,6 +65,12 @@ OVERRIDES = {
     'sandu - Freddie Hubbard': {'title': 'Sandu'},
     'Lazy Bird - Solos': {'title': 'Lazy Bird', 'tune_by': 'John Coltrane'},
     'Chessmates': {'performer': 'Joe Lovano', 'tune_by': 'Joe Lovano'},
+    'After the Love': {'title': 'After the Love Has Gone', 'performer': 'Earth, Wind & Fire',
+                       'tune_by': 'David Foster, Jay Graydon and Bill Champlin'},
+    'Happy Times': {'performer': 'Freddie Hubbard', 'tune_by': 'Freddie Hubbard'},
+    'Happy Times - Griffith Park Collection': {'performer': 'Freddie Hubbard', 'tune_by': 'Freddie Hubbard',
+                                               'subtitle': 'The Griffith Park Collection'},
+    'Wild, Wicked and the Tame': {'performer': 'The Ethics'},
     "I've Found a New Baby - Sidney Bechet": {'performer': 'Sidney Bechet'},
     # corrections checked against the recordings
     "Gertrude's Bounce - Clifford Brown Solo": {'performer': 'Clifford Brown', 'tune_by': 'Richie Powell'},

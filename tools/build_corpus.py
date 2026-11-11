@@ -102,7 +102,8 @@ def event_of(n):
             flags |= FLAG_TIE
         pitches = getattr(n, 'pitches', None) or ()
         if n.isChord and pitches:
-            midi = max(p.midi for p in pitches)
+            ps = sorted({p.midi for p in pitches})
+            midi = ps if len(ps) > 1 else ps[0]  # a chord keeps every note, for playback
         elif getattr(n, 'pitch', None) is not None and hasattr(n.pitch, 'midi'):
             midi = n.pitch.midi
         else:
@@ -171,7 +172,27 @@ def measure_events(m, bar_ticks):
             best, best_key = (evs, tins), key
     if best is None:
         raise Skip('no usable voice')
-    return best
+    # notes in the other voices that start with one of this voice's attacks sound with it
+    evs, tins = best
+    starts, pos = {}, 0
+    for i, (e, t) in enumerate(zip(evs, tins)):
+        if not e[2] & FLAG_REST and not t:
+            starts[pos] = i
+        pos += e[0]
+    for v in m.voices:
+        for n in v.notes:
+            if n.duration.isGrace or n.quarterLength == 0:
+                continue
+            if n.tie is not None and n.tie.type in ('stop', 'continue'):
+                continue
+            i = starts.get(snap_ticks(n.offset))
+            if i is None:
+                continue
+            extra = [p.midi for p in getattr(n, 'pitches', ()) if hasattr(p, 'midi')]
+            have = evs[i][3] if isinstance(evs[i][3], list) else [evs[i][3]]
+            merged = sorted(set(have) | set(extra))
+            evs[i][3] = merged if len(merged) > 1 else merged[0]
+    return evs, tins
 
 
 import re
@@ -297,6 +318,13 @@ def score_tempos(s):
     return at
 
 
+def enc_pitch(p):
+    """Pitches as hex MIDI numbers: '3c' for one note, '(3c4043)' for a chord."""
+    if isinstance(p, (list, tuple)):
+        return '(' + ''.join(f'{int(x):02x}' for x in p) + ')' if len(p) > 1 else f'{int(p[0]):02x}'
+    return f'{int(p):02x}'
+
+
 def process_parker(path):
     """One Charlie Parker transcription (tools/parker.py): the concert-pitch first staff only,
     each excerpt labeled head, solo or the other player from the score's text marks."""
@@ -332,6 +360,8 @@ def process_mvb(path):
     """One of Michael Van Bebber's transcriptions (tools/mvb.py): every staff with its own line,
     labeled by instrument; transposing staves are read at sounding pitch."""
     import mvb
+    if os.path.splitext(os.path.basename(path))[0] in mvb.EXCLUDE_FILES:
+        return []
     try:
         s = next(iter_scores(path))
         md = s.metadata
@@ -688,6 +718,8 @@ def main():
     elif os.path.exists(mvb_cache):
         with open(mvb_cache) as f:
             mine = json.load(f)
+    import mvb
+    mine = [w for w in mine if os.path.splitext(w['src'].get('file', ''))[0] not in mvb.EXCLUDE_FILES]
     book = book + mine
     if book:
         # the same recorded solo from the Weimar Jazz Database gives way to the owner's transcription
@@ -896,7 +928,7 @@ def main():
             if kept[k]:
                 kept[k] -= 1
                 continue
-            row = [o[0], pidx(o[1]), o[2], [''.join(f'{p:02x}' for p in m) for m in o[3]]]
+            row = [o[0], pidx(o[1]), o[2], [''.join(enc_pitch(p) for p in m) for m in o[3]]]
             if len(o) > 4:
                 row.append(o[4])
             rows.append(row)
@@ -910,7 +942,7 @@ def main():
     for u in items:
         u['r'] = [' '.join(enc_ev(e) for e in m) for m in u['r']]
         for o in u['o']:  # pitches as 2-digit hex MIDI numbers, one string per measure
-            o[3] = [''.join(f'{p:02x}' for p in m) for m in o[3]]
+            o[3] = [''.join(enc_pitch(p) for p in m) for m in o[3]]
     occ_path = os.path.join(os.path.dirname(os.path.abspath(args.out)), 'occurrences.js')
     with open(occ_path, 'w') as f:
         f.write('window.RHYTHM_OCC=')

@@ -174,3 +174,16 @@ section.cta + section, section + section.cta { border-top: 0; }
 .pair { display: grid; gap: 18px; }
 .pair-head { display: grid; gap: 8px; max-width: 760px; }
 .pair-head p { color: var(--muted); }
+
+/* play button on an excerpt's caption */
+.excerpt figcaption.has-play { grid-template-columns: minmax(0, 1fr) auto; column-gap: 14px; align-items: center; }
+.excerpt figcaption .src, .excerpt figcaption .where { grid-column: 1; }
+.excerpt figcaption .play { grid-column: 2; grid-row: 1 / span 2; }
+.play {
+  width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--teal); background: var(--teal); color: #fff;
+  display: grid; place-items: center; cursor: pointer; padding: 0;
+}
+.play::before { content: ""; width: 0; height: 0; margin-left: 3px; border-style: solid; border-width: 8px 0 8px 13px; border-color: transparent transparent transparent currentColor; }
+.play:hover { background: var(--teal-hover); }
+.play.is-playing::before { width: 12px; height: 12px; margin: 0; border: 0; background: currentColor; border-radius: 2px; }
+.play.is-loading { opacity: 0.6; }

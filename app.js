@@ -1417,7 +1417,8 @@
   }
 
   // ---------- corpus browser: every rhythm, searchable; tap one to practice it ----------
-  const CORPUS_ROW = 112;
+  const CORPUS_ROW = 112; // a row whose thumbnail is one staff line; each extra line adds THUMB_LINE
+  let corpusTops = [0]; // top of each row, plus the total height at the end
   let corpusOpen = false;
   let corpusList = [];
   let corpusOpener = null;
@@ -1435,7 +1436,37 @@
     return item._hay;
   }
 
-  // a one-row notation thumbnail, drawn with the same code as the score
+  // Notation thumbnails, drawn with the same code as the score, at 72%. A crowded excerpt wraps onto more
+  // staff lines (breaking only at barlines, like the score) instead of squeezing its notes together.
+  const THUMB_S = 0.72;
+  const THUMB_LINE = Math.round(72 * THUMB_S); // one staff line of a thumbnail, in px
+  function thumbMins(item) {
+    if (!item._mw) {
+      const ms = measures(item);
+      item._mw = ms.map((m, i) => measureMinWidth(m) + (i === 0 ? 66 : 0) + (i === ms.length - 1 ? 16 : 0));
+    }
+    return item._mw;
+  }
+  function thumbRows(item, W) {
+    if (item._tr && item._tr.W === W) return item._tr.rows;
+    const min = thumbMins(item);
+    const avail = (W / THUMB_S - 8) / 0.9; // up to 10% tighter than the comfortable width
+    const b = min.length;
+    let rows = null;
+    for (const per of [b, 2, 1]) {
+      if (per > b || b % per) continue;
+      const cand = [];
+      for (let i = 0; i < b; i += per) cand.push(Array.from({ length: per }, (_, k) => i + k));
+      // a row that starts mid-excerpt also needs room before its first note
+      const fits = cand.every((idxs, r) => idxs.reduce((a, k) => a + min[k], 0) + (r ? 20 : 0) <= avail);
+      rows = cand;
+      if (fits) break;
+    }
+    item._tr = { W, rows };
+    return rows;
+  }
+  const thumbHeight = (item, W) => thumbRows(item, W).length * THUMB_LINE;
+
   function thumbSVG(item, W) {
     const hit = thumbCache.get(item);
     if (hit && hit.W === W) return hit.svg;
@@ -1444,25 +1475,32 @@
       const host = document.createElement('div');
       const mi = meterInfo(item.m);
       const flat = flatten(item);
-      const ms = measures(item);
-      const s = 0.72; const Wl = W / s;
-      const min = ms.map((m, i) => measureMinWidth(m) + (i === 0 ? 66 : 0) + (i === ms.length - 1 ? 16 : 0));
-      const sum = min.reduce((acc, v) => acc + v, 0);
-      const squeeze = Math.min(1, (Wl - 8) / sum);
-      const spare = Math.max(0, Wl - 8 - sum * squeeze);
+      const min = thumbMins(item);
+      const rows = thumbRows(item, W);
+      const s = THUMB_S; const Wl = W / s;
       const renderer = new VF.Renderer(host, VF.Renderer.Backends.SVG);
-      renderer.resize(W, Math.ceil(72 * s));
+      renderer.resize(W, Math.ceil(72 * s * rows.length));
       const ctx = renderer.getContext();
       ctx.scale(s, s); ctx.setFillStyle(INK); ctx.setStrokeStyle(INK);
-      let x = 4;
-      ms.forEach((m, i) => {
-        const w = min[i] * squeeze + spare * (min[i] / sum);
-        drawBar(ctx, item, mi, flat, i, i, x, 10, w, null);
-        x += w;
+      const rowOf = [];
+      rows.forEach((idxs, r) => {
+        const sum = idxs.reduce((a, k) => a + min[k], 0) + (r ? 20 : 0);
+        const squeeze = Math.min(1, (Wl - 8) / sum);
+        const spare = Math.max(0, Wl - 8 - sum * squeeze);
+        let x = 4;
+        idxs.forEach((mIdx, k) => {
+          rowOf[mIdx] = r;
+          const base = min[mIdx] + (r && k === 0 ? 20 : 0);
+          const w = base * squeeze + spare * (base / sum);
+          drawBar(ctx, item, mi, flat, mIdx, k, x, 10 + r * 72, w, null);
+          x += w;
+        });
       });
       flat.events.forEach((ev, i) => {
         if (!(ev.flags & FLAG.TIE) || i + 1 >= flat.events.length) return;
-        new VF.StaveTie({ first_note: ev.vf, last_note: flat.events[i + 1].vf, first_indices: [0], last_indices: [0] }).setContext(ctx).draw();
+        const nx = flat.events[i + 1];
+        const mk = (a, b) => new VF.StaveTie({ first_note: a, last_note: b, first_indices: [0], last_indices: [0] }).setContext(ctx).draw();
+        if (rowOf[ev.mi] === rowOf[nx.mi]) mk(ev.vf, nx.vf); else { mk(ev.vf, null); mk(null, nx.vf); }
       });
       host.querySelector('svg').setAttribute('aria-hidden', 'true');
       svg = host.innerHTML;
@@ -1475,7 +1513,7 @@
   function corpusRowHTML(item) {
     const src = DATA.sources[item.o[0][0]];
     const where = [src[3], src[4]].filter(Boolean).join(' · ');
-    return `<div class="c-thumb">${thumbSVG(item, thumbW)}</div>
+    return `<div class="c-thumb" style="height:${thumbHeight(item, thumbW)}px">${thumbSVG(item, thumbW)}</div>
       <div class="c-meta">
         <span class="c-chips"><span class="chip">${item.m}</span><span class="chip">Level ${item.l}</span><span class="chip">${item.b} bar${item.b > 1 ? 's' : ''}</span>${item.n > 1 ? `<span class="c-n">in ${item.n} pieces</span>` : ''}</span>
         <span class="c-src"><b>${esc(src[0])}</b>${src[1] ? ' · ' + esc(src[1]) : ''}${where ? ' · ' + esc(where) : ''}</span>
@@ -1487,7 +1525,7 @@
     const where = [src[3], src[4]].filter(Boolean).join(' · ');
     const bars = occ[2] != null ? `mm. ${occ[2]}–${occ[2] + item.b - 1}` : '';
     const same = item === corpusFamily;
-    return `<div class="c-thumb">${thumbSVG(item, thumbW)}</div>
+    return `<div class="c-thumb" style="height:${thumbHeight(item, thumbW)}px">${thumbSVG(item, thumbW)}</div>
       <div class="c-meta">
         <span class="c-chips"><span class="chip">${item.m}</span><span class="chip">Level ${item.l}</span><span class="chip">${item.b} bar${item.b > 1 ? 's' : ''}</span><span class="c-n">${same ? 'as shown' : 'written another way'}</span></span>
         <span class="c-src"><b>${esc(src[0])}</b>${src[1] ? ' · ' + esc(src[1]) : ''}${where ? ' · ' + esc(where) : ''}${bars ? ' · ' + bars : ''}</span>
@@ -1499,7 +1537,7 @@
     const wide = sc.clientWidth >= 640;
     $('corpus').classList.toggle('wide-rows', wide);
     const w = Math.max(200, Math.floor(wide ? (sc.clientWidth - 32 - 16) * 0.56 : sc.clientWidth - 32));
-    if (w !== thumbW) { thumbW = w; rowEls.forEach((el) => el.remove()); rowEls.clear(); }
+    if (w !== thumbW) { thumbW = w; rowEls.forEach((el) => el.remove()); rowEls.clear(); if (corpusList.length) layoutCorpus(); }
   }
 
   function refreshFamily() {
@@ -1523,7 +1561,7 @@
       + (spellings > 1 ? `, written ${spellings} ways with the same proportions` : '');
     $('corpusCount').textContent = `${songs.toLocaleString()} piece${songs === 1 ? '' : 's'}`
       + (q ? ` for “${$('corpusSearch').value.trim()}”` : '');
-    $('corpusSpacer').style.height = (rows.length * CORPUS_ROW) + 'px';
+    layoutCorpus();
     $('corpusSpacer').querySelectorAll('.c-empty').forEach((e) => e.remove());
     if (!rows.length) $('corpusSpacer').insertAdjacentHTML('beforeend', '<p class="c-empty">No passages match that search.</p>');
     rowEls.forEach((el) => el.remove()); rowEls.clear();
@@ -1531,17 +1569,34 @@
     renderCorpusRows();
   }
 
+  const rowItem = (entry) => (entry && entry.item ? entry.item : entry);
+  function layoutCorpus() {
+    corpusTops = [0];
+    for (const entry of corpusList) {
+      const lines = thumbRows(rowItem(entry), thumbW).length;
+      corpusTops.push(corpusTops[corpusTops.length - 1] + CORPUS_ROW + (lines - 1) * THUMB_LINE);
+    }
+    $('corpusSpacer').style.height = corpusTops[corpusTops.length - 1] + 'px';
+  }
+  // index of the row at height y
+  function rowAt(y) {
+    let lo = 0, hi = corpusList.length - 1;
+    while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (corpusTops[mid] <= y) lo = mid; else hi = mid - 1; }
+    return Math.max(0, lo);
+  }
+
   function renderCorpusRows() {
     if (!corpusOpen) return;
     const sc = $('corpusScroll');
-    const first = Math.max(0, Math.floor(sc.scrollTop / CORPUS_ROW) - 3);
-    const last = Math.min(corpusList.length - 1, Math.ceil((sc.scrollTop + sc.clientHeight) / CORPUS_ROW) + 3);
+    const first = Math.max(0, rowAt(sc.scrollTop) - 3);
+    const last = Math.min(corpusList.length - 1, rowAt(sc.scrollTop + sc.clientHeight) + 3);
     for (const [i, el] of rowEls) if (i < first || i > last) { el.remove(); rowEls.delete(i); }
     for (let i = first; i <= last; i++) {
       if (rowEls.has(i)) continue;
       const el = document.createElement('button');
       el.type = 'button'; el.className = 'c-row'; el.dataset.i = i;
-      el.style.top = (i * CORPUS_ROW) + 'px';
+      el.style.top = corpusTops[i] + 'px';
+      el.style.height = (corpusTops[i + 1] - corpusTops[i]) + 'px';
       el.innerHTML = corpusFamily ? familyRowHTML(corpusList[i]) : corpusRowHTML(corpusList[i]);
       el.setAttribute('aria-label', `Practice: ${el.textContent.replace(/\s+/g, ' ').trim()}`);
       $('corpusSpacer').appendChild(el);
@@ -1571,7 +1626,7 @@
       ? `${all} rhythms in the corpus, each a real passage`
       : `${list.length.toLocaleString()} ${only ? 'matching ' : ''}rhythm${list.length === 1 ? '' : 's'}`
         + (q ? ` for “${$('corpusSearch').value.trim()}”` : '') + ` · ${all} in the whole corpus`;
-    $('corpusSpacer').style.height = (list.length * CORPUS_ROW) + 'px';
+    layoutCorpus();
     $('corpusSpacer').querySelectorAll('.c-empty').forEach((e) => e.remove());
     if (!list.length) $('corpusSpacer').insertAdjacentHTML('beforeend', '<p class="c-empty">No rhythms match. Try a different search, or switch off “Only rhythms matching my settings”.</p>');
     rowEls.forEach((el) => el.remove()); rowEls.clear();

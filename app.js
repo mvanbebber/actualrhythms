@@ -190,10 +190,13 @@
 
   // ---------- notation ----------
   // Unscaled geometry of one notation row: staff line, then two feedback lanes (one per pass).
-  const ROW_H = 112;
-  const LINE_Y = 52;
-  const LANE_Y = 27;
-  const LANE_GAP = 19;
+  // Phones and tablets (touch) use a tighter row so staff lines sit closer together; there is still
+  // room for the feedback lanes, so nothing moves when results appear.
+  const COMPACT = document.documentElement.hasAttribute('data-touch');
+  const ROW_H = COMPACT ? 94 : 112;    // row height for two passes
+  const LINE_Y = COMPACT ? 48 : 52;    // staff line, from the row's top (stems, beams, triplet numbers above)
+  const LANE_Y = 27;                   // first feedback lane, below the staff line (clear of the time signature)
+  const LANE_GAP = COMPACT ? 13 : 19;  // between lanes
   // room under the staff for one feedback lane per time through
   const rowHeight = () => ROW_H + (reps() - 2) * LANE_GAP;
   const INK = '#202622';
@@ -344,7 +347,8 @@
     let canvasW = W;
     if (widest * squeeze > Wl - 8) { canvasW = Math.ceil((widest * squeeze + 8) * s); Wl = canvasW / s; }
     const rowH = rowHeight();
-    const H = plan.rows.length * rowH;
+    const TOP_PAD = COMPACT ? 6 : 0; // the first line has nothing above it to borrow room from
+    const H = plan.rows.length * rowH + TOP_PAD;
     const renderer = new VF.Renderer(host, VF.Renderer.Backends.SVG);
     renderer.resize(canvasW, Math.ceil(H * s));
     const ctx = renderer.getContext();
@@ -357,7 +361,7 @@
     const rowsInfo = [];
     const rowOfMeasure = [];
     plan.rows.forEach((idxs, r) => {
-      const rowTop = r * rowH;
+      const rowTop = r * rowH + TOP_PAD;
       const y = rowTop + LINE_Y - 40; // stave line sits 40px below the stave's y (4 spaces of headroom)
       const sum = idxs.reduce((acc, k) => acc + plan.min[k] * squeeze, 0);
       const spare = Math.max(0, Wl - 8 - sum);

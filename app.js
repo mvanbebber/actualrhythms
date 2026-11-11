@@ -15,7 +15,7 @@
     4: ['Sixteenths', 'Sixteenth-note grid, dotted eighth + sixteenth.'],
     5: ['Advanced', 'Triplets, 32nds, sixteenth syncopation.'],
   };
-  const GENRES = { folk: 'Folk tunes', chorale: 'Bach chorales', classical: 'Classical', ragtime: 'Ragtime', jazz: 'Jazz solos', popular: 'Popular songs', latin: 'Latin rhythms' };
+  const GENRES = { folk: 'Folk tunes', chorale: 'Bach chorales', classical: 'Classical', ragtime: 'Ragtime', jazz: 'Jazz solos', popular: 'Pop songs', latin: 'Latin rhythms' };
   // Accuracy modes: 'perfect' earns full credit, 'good' 75%, anything else inside the matching window 40%.
   const ACCURACY = {
     easy: { label: 'Easy', perfect: 0.110, good: 0.160, cap: 0.25 },
@@ -751,19 +751,22 @@
     const NAMES = { 0: 'C', 3: 'Eb', 6: 'Gb', 9: 'A' };
     // a drum part's note -> kit piece, by its position on the percussion staff (standard drum-set
     // notation: hi-hat pedal below the staff, kick in the bottom space, floor tom on the second space,
-    // time slashes on the middle line, snare on the third space, toms above it, ride on the top line,
+    // medium tom on the middle line, snare on the third space, high toms above it, ride on the top line,
     // hi-hat above the staff, crash on the first ledger line)
     const kitPiece = (m) => (!m ? 'snare' : m <= 61 ? 'kick' : m <= 63 ? 'hihat' : m <= 67 ? 'kick' : m <= 70 ? 'tom-low'
-      : m <= 73 ? 'snare' : m <= 76 ? 'tom' : m <= 78 ? 'ride' : m <= 80 ? 'hihat' : 'crash');
-    const KIT_MIX = { kick: 1, snare: 0.95, 'tom-low': 0.85, tom: 0.85, ride: 0.55, hihat: 0.5, 'hihat-open': 0.55, crash: 0.6 };
+      : m === 71 ? 'tom-mid' : m <= 73 ? 'snare' : m <= 76 ? 'tom' : m <= 78 ? 'ride' : m <= 80 ? 'hihat' : 'crash');
+    // the kit has two toms; the medium tom is the low one tuned up a minor third
+    const KIT_FILE = { 'tom-mid': ['tom-low', Math.pow(2, 3 / 12)] };
+    const KIT_MIX = { kick: 1, snare: 0.95, 'tom-low': 0.85, 'tom-mid': 0.85, tom: 0.85, ride: 0.55, hihat: 0.5, 'hihat-open': 0.55, crash: 0.6 };
     let OFF = { instruments: {}, drums: {} };
     const ready = Promise.all(['instruments', 'drums'].map((k) => fetch(`audio/${k}/offsets.json`)
       .then((r) => (r.ok ? r.json() : {})).then((j) => { OFF[k] = j; }).catch(() => {})));
     function sample(inst, midi) {
       if (inst.kind === 'drums') {
         const piece = inst.kickOnly ? 'kick' : kitPiece(midi);
-        const o = OFF.drums[`${piece}.mp3`] || [0, 0.05, 0.3];
-        return { url: `audio/drums/${piece}.mp3`, rate: 1, start: o[0], gain: (KIT_MIX[piece] * 0.6) / o[2] };
+        const [file, rate] = KIT_FILE[piece] || [piece, 1];
+        const o = OFF.drums[`${file}.mp3`] || [0, 0.05, 0.3];
+        return { url: `audio/drums/${file}.mp3`, rate, start: o[0], gain: (KIT_MIX[piece] * 0.6) / o[2] };
       }
       let m = midi || 48;
       while (m < inst.lo) m += 12; // written outside the sampled range: move by octaves
@@ -791,16 +794,16 @@
           src.buffer = buf; src.playbackRate.value = s.rate;
           const level = (0.75 + 0.35 * vel) * gain * s.gain;
           g.gain.setValueAtTime(level, t);
-          if (inst.kind === 'drums') {
-            src.stop(t + buf.duration); // a drum rings out
-          } else {
+          let end = t + buf.duration; // a drum rings out
+          if (inst.kind !== 'drums') {
             const off = t + Math.max(0.06, dur);
             g.gain.setValueAtTime(level, off);
             g.gain.setTargetAtTime(0, off, 0.05); // the string is damped at the note's end
-            src.stop(off + 0.5);
+            end = off + 0.5;
           }
           src.connect(g).connect(dest);
           src.start(t, s.start); // skip the sample's lead-in so the attack lands on the beat
+          src.stop(end); // (only after start: stopping first throws)
           scheduled.push(src);
         });
       }).catch(() => { /* a missing sample just stays silent */ });
@@ -1320,7 +1323,7 @@
   // ---------- settings component ----------
   const PRIMARY_METERS = ['2/4', '3/4', '4/4', '6/8'].filter((m) => METER_ORDER.includes(m));
   const MORE_METERS = METER_ORDER.filter((m) => !PRIMARY_METERS.includes(m));
-  const GENRE_SHORT = { folk: 'Folk', chorale: 'Bach', classical: 'Classical', ragtime: 'Ragtime', jazz: 'Jazz', popular: 'Songs', latin: 'Latin' };
+  const GENRE_SHORT = { folk: 'Folk', chorale: 'Bach', classical: 'Classical', ragtime: 'Ragtime', jazz: 'Jazz', popular: 'Pop', latin: 'Latin' };
 
   function toggleGroup(el, entries, key, multi, repick = true, withAll = false) {
     const changed = () => {

@@ -6,7 +6,7 @@ require(require('path').join(__dirname, '..', '..', 'data', 'rhythms.js'));
 require(require('path').join(__dirname, '..', '..', 'data', 'occurrences.js'));
 const D = window.RHYTHM_DATA; const O = window.RHYTHM_OCC;
 const GENRES = ['folk', 'chorale', 'classical', 'ragtime', 'jazz', 'popular', 'latin', 'african'];
-const LABEL = { folk: 'Folk tunes', chorale: 'Bach chorales', classical: 'Classical', ragtime: 'Ragtime', jazz: 'Jazz', popular: 'Pop songs', latin: 'Latin patterns', african: 'African timelines' };
+const LABEL = { folk: 'Folk tunes', chorale: 'Bach chorales', classical: 'Classical', ragtime: 'Ragtime', jazz: 'Jazz', popular: 'Pop songs', latin: 'Latin patterns', african: 'African rhythms' };
 const genreOfSrc = (i) => D.collections[D.sources[i][2]].genre;
 const allOcc = (r, i) => r.o.concat((O.o[i] || []).map((o) => [o[0], O.parts[o[1]], o[2], o[3]].concat(o.slice(4))));
 

@@ -52,12 +52,23 @@ COLLECTIONS = {
     'openewld': ('OpenEWLD lead sheets', 'popular'),
     'latin': ('Standard Latin rhythms', 'latin'),
     'african': ('African timelines', 'african'),
+    'iemp': ('IEMP Malian Jembe recordings', 'african'),
+    'djembegorilla': ('Djembe Gorilla rhythm library', 'african'),
+    'djembel': ("Raymond's Transcriptions (Djembe-L)", 'african'),
+    'djembenet': ('Djembe N E T', 'african'),
+    'pdmxafrica': ('PDMX (Public Domain MusicXML)', 'african'),
 }
 
 # a credit and a link shown with a collection's name
 COLLECTION_EXTRA = {
     'parkerbook': {'credit': 'transcribed by Michael Van Bebber', 'url': 'https://qpress.ca/product/60-melodies-solos-charlie-parker-omnibook'},
+    'iemp': {'credit': 'Polak, Tarsitani & Clayton, used with permission', 'url': 'https://doi.org/10.17605/OSF.IO/M652X'},
+    'djembegorilla': {'credit': 'used with permission', 'url': 'https://djembegorilla.com/library/'},
+    'djembel': {'credit': 'compiled by Bob Miller from the Djembe-L list, used with permission', 'url': 'https://bobmiller.yolasite.com/'},
+    'djembenet': {'credit': 'used with permission', 'url': 'https://www.djembe.net/'},
+    'pdmxafrica': {'credit': 'used with permission', 'url': 'https://zenodo.org/records/13763756'},
 }
+AFRICAN_FOLDERS = ('african', 'iemp', 'djembegorilla', 'djembel', 'djembenet', 'pdmxafrica')
 UNPITCHED_MIDI = 72
 
 
@@ -271,6 +282,10 @@ def score_title(s, path, folder):
 
 def iter_scores(path):
     from music21 import converter, stream
+    if path.endswith('.json'):  # a PDMX MusicRender score (tools/pdmx_african.py)
+        import pdmx_african
+        yield pdmx_african.to_score(path)
+        return
     obj = converter.parse(path)
     if isinstance(obj, stream.Opus):
         yield from obj.scores
@@ -451,6 +466,7 @@ def process_file(args):
                 title, composer = meta['title'], meta['composer']
             md = s.metadata
             extra = {'file': fname, 'origin': (meta or {}).get('origin'), 'date': (meta or {}).get('date'),
+                     **({'note': meta['note']} if meta and meta.get('note') else {}),
                      'origin_raw': clean_title(md.localeOfComposition, folder) if md is not None and md.localeOfComposition else None,
                      's_year': s_years.get(str(md.number)) if md is not None and md.number is not None else None}
             for part, pname in parts_of(s, folder):
@@ -662,6 +678,8 @@ def main():
                     help='MusicXML exports of Michael Van Bebber\'s Charlie Parker transcriptions (used with permission)')
     ap.add_argument('--mvb', metavar='DIR',
                     help="MusicXML exports of Michael Van Bebber's transcriptions (used with permission)")
+    ap.add_argument('--pdmx-african', metavar='DIR',
+                    help='.mxl files of the African scores listed in tools/pdmx_african.py, named by PDMX hash')
     ap.add_argument('--wjd', metavar='DIR',
                     help="jazzodata's data/ folder (git clone https://github.com/klausfrieler/jazzodata); adds jazz solos")
     args = ap.parse_args()
@@ -719,6 +737,28 @@ def main():
     aw = african.african_windows()
     found.extend(aw)
     print(f'african: {len(aw)} windows from {len(african.PATTERNS)} patterns', file=sys.stderr)
+    # African songs from PDMX: parsed with --pdmx-african, otherwise read from the saved excerpts
+    import pdmx_african
+    pdmx_cache = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pdmx-african-windows.json')
+    if args.pdmx_african:
+        pw = []
+        with Pool(args.jobs) as pool:
+            for res in pool.imap_unordered(process_file, list(pdmx_african.jobs(args.pdmx_african))):
+                pw.extend(res)
+        pw.sort(key=lambda w: (w['src']['title'], w['src']['part'], w['src']['bar'], w['bars']))
+        with open(pdmx_cache, 'w') as f:
+            json.dump(pw, f, separators=(',', ':'), ensure_ascii=False)
+    elif os.path.exists(pdmx_cache):
+        with open(pdmx_cache) as f:
+            pw = json.load(f)
+    else:
+        pw = []
+    found.extend(pw)
+    print(f'pdmx african: {len(pw)} windows', file=sys.stderr)
+    import african_drums  # African drum rhythms: tools/african-drums.json (tools/african_sources.py)
+    dw = african_drums.drum_windows(windows_from_bars)
+    found.extend(dw)
+    print(f'african drums: {len(dw)} windows', file=sys.stderr)
 
     if args.wjd:
         import wjd
@@ -832,7 +872,7 @@ def main():
         if s['folder'] == 'essenFolksong':  # drop source page references: '(273), S. 583', '(Band 1), S. 11'
             s['title'] = re.sub(r'\s*\((?:Band \d+|[\d\-]+[a-z]?)\)', '', s['title'])
             s['title'] = re.sub(r',\s*S\.\s*\d+\w*\s*$', '', s['title']).strip() or s['title']
-        if s['title'].islower() and s['folder'] not in ('latin', 'african'):
+        if s['title'].islower() and s['folder'] not in ('latin',) + AFRICAN_FOLDERS:
             s['title'] = string.capwords(s['title'])
         if s['folder'] in COMPOSERS:
             s['composer'] = COMPOSERS[s['folder']]
@@ -1029,7 +1069,10 @@ def main():
         s = w['src']
         # Latin patterns stay their own entries (at their natural length); they're linked to matching
         # excerpts below by where the notes fall
-        key = ('latin', s['title']) if w.get('fixed') else (w['meter'], json.dumps([[e[:3] for e in m] for m in w['measures']]))
+        # (a repeating drum part is keyed by its rhythm, so the same part in many rhythms is one entry)
+        rkey = (w['meter'], json.dumps([[e[:3] for e in m] for m in w['measures']]))
+        key = ('latin', s['title']) if w.get('fixed') and s['folder'] in ('latin', 'african') else \
+            ('fixed',) + rkey if w.get('fixed') else rkey
         skey = (s['title'], s['composer'], s['folder'])
         if skey not in src_index:
             src_index[skey] = len(sources)

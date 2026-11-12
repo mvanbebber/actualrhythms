@@ -25,6 +25,21 @@ PATTERNS = [
      'A five-stroke timeline in four (4-2-4-2-4 sixteenths), as Toussaint gives it.'),
     ('Soukous', '4/4', ['8d 16 8r 8 8r 16 16 qr'], 'Bell', 'Congo', 'traditional', [79],
      'The timeline of Congolese soukous (3-3-4-1-5 sixteenths): son clave with its last stroke pulled forward.'),
+    # six more seven-stroke 12/8 bell patterns, from Toussaint's "Classification and Phylogenetic Analysis of
+    # African Ternary Rhythm Timelines" (Bridges 2003, figure 3): rearrangements of the standard pattern's
+    # intervals. (The paper's Tambú, Tonada and Bembé-2 are Caribbean, so they're left out.)
+    ('Soli bell', '12/8', ['q 8 8r q q 8 q 8'], 'Bell', 'Guinea (Malinke)', 'traditional', [79],
+     'The bell of Soli, a Malinke rhythm (2-2-2-2-1-2-1), as Toussaint gives it.'),
+    ('Yoruba bell', '12/8', ['q 8 8r 8 8 8r q 8 q'], 'Bell', 'Nigeria (Yoruba)', 'traditional', [79],
+     'A Yoruba 12/8 bell pattern (2-2-1-2-2-1-2), as Toussaint gives it.'),
+    ('Asaadua', '12/8', ['q 8 8r q 8 q 8 q'], 'Bell', 'Ghana (Akan)', 'traditional', [79],
+     'The bell of Asaadua, Akan recreational music (2-2-2-1-2-1-2), as Toussaint gives it.'),
+    ('Sorsonet', '12/8', ['8 8 8 8r q q 8 8r q'], 'Bell', 'Guinea', 'traditional', [79],
+     'The bell of Sorsonet (1-1-2-2-2-2-2), as Toussaint gives it.'),
+    ('Bemba bell', '12/8', ['q 8 q 8 8r q 8 q'], 'Bell', 'Zambia (Bemba)', 'traditional', [79],
+     'A bell pattern of the Bemba people (2-1-2-2-2-1-2), as Toussaint gives it.'),
+    ('Ashanti bell', '12/8', ['q 8 q 8 8r 8 8 8r q'], 'Bell', 'Ghana (Ashanti)', 'traditional', [79],
+     'An Ashanti bell pattern (2-1-2-2-1-2-2), as Toussaint gives it.'),
 ]
 
 

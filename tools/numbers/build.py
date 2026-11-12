@@ -328,7 +328,7 @@ thead th {{ font-size: 12px; color: var(--muted); font-weight: 600; }}
     </div>
   </section>
 
-  <p class="foot">Counted from the Actual Rhythms corpus: the music21 corpus, Craig Stuart Sapp's edition of Joplin's rags, OpenEWLD lead sheets, the Weimar Jazz Database, the Essen, O'Neill, Ryan and Aird collections, and Michael Van Bebber's jazz and song transcriptions and <em>Charlie Parker 60 Melodies and Solos</em>. A rhythm is two or four bars; the same rhythm in several pieces counts once. Notation drawn by the app.</p>
+  <p class="foot">Counted from the Actual Rhythms corpus: the music21 corpus, Craig Stuart Sapp's edition of Joplin's rags, OpenEWLD lead sheets, the Weimar Jazz Database, the Essen, O'Neill, Ryan and Aird collections, Michael Van Bebber's jazz and song transcriptions and <em>Charlie Parker 60 Melodies and Solos</em>, the African drum archives (IEMP Malian Jembe, Djembe Gorilla, Djembe-L, Djembe N E T) and African songs from PDMX. A rhythm is two or four bars; the same rhythm in several pieces counts once. Notation drawn by the app.</p>
 </div>
 <div id="tip" hidden></div>
 <script>

@@ -795,12 +795,15 @@
   // Bass and guitar: FluidR3 GM (Frank Wen, CC BY 3.0), sampled every minor third. Drums: the
   // Salamander Drumkit (Alexander Holm, CC BY-SA 3.0), one hit per kit piece.
   const BASS_DIRS = { synth: 'synth_bass_1', electric: 'electric_bass_finger', acoustic: 'acoustic_bass' };
+  const DRUM_ARCHIVES = new Set(['iemp', 'djembegorilla', 'djembel', 'djembenet']);
   function instrumentOf(occ) {
     if (!occ) return null;
     const part = occ[1] || '';
     const genre = genreOf(occ);
     if (/bass drum|surdo/i.test(part)) return { kind: 'drums', kickOnly: true };
     if (/drum/i.test(part)) return { kind: 'drums' };
+    // the African drum archives (jembe, dunun, bells): each stroke is set on the kit by the build (tools/african_drums.py)
+    if (DRUM_ARCHIVES.has(DATA.sources[occ[0]][2])) return { kind: 'drums' };
     // sung and orchestral bass lines (chorales, madrigals, classical) stay on the piano
     if (/\bbass\b/i.test(part) && !/clarinet|drum/i.test(part) && genre !== 'chorale' && genre !== 'classical') {
       const type = /synth/i.test(part) ? 'synth' : /electric/i.test(part) ? 'electric'
@@ -1219,7 +1222,7 @@
     const seeAll = (text) => `<button type="button" class="link-btn inline" data-action="family">${text}</button>`;
     const q = occ[4];
     const tempoLine = q ? `<p>Tempo: ${originalTempo()} BPM${current.mi.compound ? ` (dotted-${current.mi.den === 8 ? 'quarter' : 'half'} beat)` : ''}, ${
-      folder === 'wjd' ? 'the average tempo of the recording' : 'from the metronome mark in the score'}.</p>` : '';
+      folder === 'wjd' ? 'the average tempo of the recording' : folder === 'iemp' ? 'the tempo of the recording at this point' : 'from the metronome mark in the score'}.</p>` : '';
     // one link to the full list: this spelling's count, plus the same proportions written other ways
     const altText = alt.n ? `, and in ${alt.n} more written another way (${esc(altMeters)}) with the same proportions` : '';
     const occurs = item.n > 1 || alt.n

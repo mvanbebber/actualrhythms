@@ -15,7 +15,7 @@
     4: ['Sixteenths', 'Sixteenth-note grid, dotted eighth + sixteenth.'],
     5: ['Advanced', 'Triplets, 32nds, sixteenth syncopation.'],
   };
-  const GENRES = { folk: 'Folk tunes', chorale: 'Bach chorales', classical: 'Classical', ragtime: 'Ragtime', jazz: 'Jazz solos', popular: 'Pop songs', latin: 'Latin rhythms', african: 'African rhythms' };
+  const GENRES = { folk: 'Folk tunes', chorale: 'Bach chorales', classical: 'Classical', ragtime: 'Ragtime', jazz: 'Jazz solos', popular: 'Pop songs', latin: 'Latin rhythms', african: 'African rhythms', caribbean: 'Caribbean rhythms' };
   // Accuracy modes: 'perfect' earns full credit, 'good' 75%, anything else inside the matching window 40%.
   const ACCURACY = {
     easy: { label: 'Easy', perfect: 0.110, good: 0.160, cap: 0.25 },
@@ -795,7 +795,7 @@
   // Bass and guitar: FluidR3 GM (Frank Wen, CC BY 3.0), sampled every minor third. Drums: the
   // Salamander Drumkit (Alexander Holm, CC BY-SA 3.0), one hit per kit piece.
   const BASS_DIRS = { synth: 'synth_bass_1', electric: 'electric_bass_finger', acoustic: 'acoustic_bass' };
-  const DRUM_ARCHIVES = new Set(['iemp', 'djembegorilla', 'djembel', 'djembenet', 'iempcandombe', 'gorillalatin', 'djembellatin', 'gmdlatin', 'gmdafrica']);
+  const DRUM_ARCHIVES = new Set(['iemp', 'djembegorilla', 'djembel', 'djembenet', 'iempcandombe', 'gorillalatin', 'djembellatin', 'gmdlatin', 'gmdafrica', 'gmdcaribbean']);
   function instrumentOf(occ) {
     if (!occ) return null;
     const part = occ[1] || '';
@@ -809,7 +809,7 @@
     // sung and orchestral bass lines (chorales, madrigals, classical) stay on the piano
     if (/\bbass\b/i.test(part) && !/clarinet|drum/i.test(part) && genre !== 'chorale' && genre !== 'classical') {
       const type = /synth/i.test(part) ? 'synth' : /electric/i.test(part) ? 'electric'
-        : /upright|acoustic|string/i.test(part) || genre === 'jazz' || genre === 'latin' ? 'acoustic' : 'electric';
+        : /upright|acoustic|string/i.test(part) || genre === 'jazz' || genre === 'latin' || genre === 'caribbean' ? 'acoustic' : 'electric';
       return { kind: 'pitched', dir: BASS_DIRS[type], lo: 24, hi: 72 };
     }
     if (/guitar/i.test(part)) return { kind: 'pitched', dir: /acoustic/i.test(part) ? 'acoustic_guitar_steel' : 'electric_guitar_clean', lo: 36, hi: 96 };
@@ -1447,7 +1447,7 @@
   // ---------- settings component ----------
   const PRIMARY_METERS = ['2/4', '3/4', '4/4', '6/8'].filter((m) => METER_ORDER.includes(m));
   const MORE_METERS = METER_ORDER.filter((m) => !PRIMARY_METERS.includes(m));
-  const GENRE_SHORT = { folk: 'Folk', chorale: 'Bach', classical: 'Classical', ragtime: 'Ragtime', jazz: 'Jazz', popular: 'Pop', latin: 'Latin', african: 'African' };
+  const GENRE_SHORT = { folk: 'Folk', chorale: 'Bach', classical: 'Classical', ragtime: 'Ragtime', jazz: 'Jazz', popular: 'Pop', latin: 'Latin', african: 'African', caribbean: 'Caribbean' };
 
   function toggleGroup(el, entries, key, multi, repick = true, withAll = false) {
     const changed = () => {

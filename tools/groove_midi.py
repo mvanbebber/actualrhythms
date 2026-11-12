@@ -5,7 +5,7 @@ Ten professional drummers played the dataset on an electronic kit to a click; ea
 named for its style. This reads the grooves (not the two-second fills) in Latin American, Afro-Cuban, reggae,
 calypso, afrobeat and highlife styles, quantizes each to the sixteenth or the eighth-note triplet (whichever the playing fits
 better), and splits the kit into its lines: kick, snare, cross-stick, hi-hat, ride and toms. The lines go into
-tools/latin-rhythms.json and tools/african-drums.json, spelled as notation by tools/african_drums.py.
+tools/latin-rhythms.json (Latin and Caribbean) and tools/african-drums.json, spelled as notation by tools/african_drums.py.
 
 Usage: python3 groove_midi.py DIR   (DIR: the unzipped groove/ folder of groove-v1.0.0-midionly.zip)
 """
@@ -41,10 +41,9 @@ STYLES = {
     'afrocuban': ('Afro-Cuban groove', 'Cuba', 'latin'),
     'afrocuban/bembe': ('Bembé', 'Cuba', 'latin'),
     'afrocuban/rhumba': ('Rumba', 'Cuba', 'latin'),
-    # Caribbean styles go with the Latin rhythms (the app has no Caribbean group)
-    'reggae': ('Reggae', 'Jamaica', 'latin'),
-    'reggae/slow': ('Reggae', 'Jamaica', 'latin'),
-    'afrocuban/calypso': ('Calypso', 'Trinidad and Tobago', 'latin'),
+    'reggae': ('Reggae', 'Jamaica', 'caribbean'),
+    'reggae/slow': ('Reggae', 'Jamaica', 'caribbean'),
+    'afrocuban/calypso': ('Calypso', 'Trinidad and Tobago', 'caribbean'),
     'afrobeat': ('Afrobeat', 'Nigeria', 'african'),
     'highlife': ('Highlife', 'Ghana', 'african'),
 }
@@ -113,7 +112,7 @@ def grooves(d):
             if g.count('x') < 4:
                 continue
             lines.append({
-                'folder': 'gmdlatin' if region == 'latin' else 'gmdafrica', 'region': region,
+                'folder': {'latin': 'gmdlatin', 'caribbean': 'gmdcaribbean', 'african': 'gmdafrica'}[region], 'region': region,
                 'title': name, 'composer': f'Drummer {drummer}', 'part': f'Drum kit: {line.lower()}',
                 'meter': '12/8' if triplet else f'{num}/{den}', 'slots': slots, 'grid': g,
                 'tempi': [bpm] * n_bars, 'origin': origin, 'date': 'recorded 2018',
@@ -126,7 +125,8 @@ def grooves(d):
 
 def main():
     lines = grooves(sys.argv[1])
-    for region, fname, folder in (('latin', 'latin-rhythms.json', 'gmdlatin'), ('african', 'african-drums.json', 'gmdafrica')):
+    for region, fname, folder in (('latin', 'latin-rhythms.json', 'gmdlatin'), ('caribbean', 'latin-rhythms.json', 'gmdcaribbean'),
+                                  ('african', 'african-drums.json', 'gmdafrica')):
         path = os.path.join(HERE, fname)
         old = [ln for ln in json.load(open(path)) if ln['folder'] != folder]
         new = [{k: v for k, v in ln.items() if k != 'region'} for ln in lines if ln['region'] == region]

@@ -64,6 +64,9 @@ COLLECTIONS = {
     'pdmxlatin': ('PDMX (Public Domain MusicXML)', 'latin'),
     'gmdlatin': ('Groove MIDI Dataset', 'latin'),
     'gmdafrica': ('Groove MIDI Dataset', 'african'),
+    'caribbean': ('Standard Caribbean patterns', 'caribbean'),
+    'gmdcaribbean': ('Groove MIDI Dataset', 'caribbean'),
+    'pdmxcaribbean': ('PDMX (Public Domain MusicXML)', 'caribbean'),
 }
 
 # a credit and a link shown with a collection's name
@@ -81,9 +84,12 @@ COLLECTION_EXTRA = {
     'pdmxlatin': {'credit': 'used with permission', 'url': 'https://zenodo.org/records/13763756'},
     'gmdlatin': {'credit': 'Magenta, CC BY 4.0', 'url': 'https://magenta.tensorflow.org/datasets/groove'},
     'gmdafrica': {'credit': 'Magenta, CC BY 4.0', 'url': 'https://magenta.tensorflow.org/datasets/groove'},
+    'gmdcaribbean': {'credit': 'Magenta, CC BY 4.0', 'url': 'https://magenta.tensorflow.org/datasets/groove'},
+    'pdmxcaribbean': {'credit': 'used with permission', 'url': 'https://zenodo.org/records/13763756'},
 }
 AFRICAN_FOLDERS = ('african', 'iemp', 'djembegorilla', 'djembel', 'djembenet', 'pdmxafrica', 'gmdafrica')
-LATIN_FOLDERS = ('latin', 'iempcandombe', 'iempcuba', 'gorillalatin', 'djembellatin', 'pdmxlatin', 'gmdlatin')
+LATIN_FOLDERS = ('latin', 'iempcandombe', 'iempcuba', 'gorillalatin', 'djembellatin', 'pdmxlatin', 'gmdlatin',
+                 'caribbean', 'gmdcaribbean', 'pdmxcaribbean')
 UNPITCHED_MIDI = 72
 
 
@@ -697,6 +703,8 @@ def main():
                     help='.mxl files of the African scores listed in tools/pdmx_african.py, named by PDMX hash')
     ap.add_argument('--pdmx-latin', metavar='DIR',
                     help='JSON files of the Latin American scores listed in tools/pdmx_latin.py, named by PDMX hash')
+    ap.add_argument('--pdmx-caribbean', metavar='DIR',
+                    help='JSON files of the Caribbean scores listed in tools/pdmx_caribbean.py, named by PDMX hash')
     ap.add_argument('--wjd', metavar='DIR',
                     help="jazzodata's data/ folder (git clone https://github.com/klausfrieler/jazzodata); adds jazz solos")
     args = ap.parse_args()
@@ -750,6 +758,8 @@ def main():
     lw = latin.latin_windows()
     found.extend(lw)
     print(f'latin: {len(lw)} windows from {len(latin.PATTERNS)} patterns', file=sys.stderr)
+    cw = latin.caribbean_windows()
+    found.extend(cw)
     import african  # African timelines, written out in tools/african.py
     aw = african.african_windows()
     found.extend(aw)
@@ -758,7 +768,9 @@ def main():
     # saved excerpts
     import pdmx_african
     import pdmx_latin
-    for mod, arg, name in ((pdmx_african, args.pdmx_african, 'african'), (pdmx_latin, args.pdmx_latin, 'latin')):
+    import pdmx_caribbean
+    for mod, arg, name in ((pdmx_african, args.pdmx_african, 'african'), (pdmx_latin, args.pdmx_latin, 'latin'),
+                           (pdmx_caribbean, args.pdmx_caribbean, 'caribbean')):
         cache = os.path.join(os.path.dirname(os.path.abspath(__file__)), f'pdmx-{name}-windows.json')
         if arg:
             pw = []
@@ -1094,7 +1106,7 @@ def main():
         # excerpts below by where the notes fall
         # (a repeating drum part is keyed by its rhythm, so the same part in many rhythms is one entry)
         rkey = (w['meter'], json.dumps([[e[:3] for e in m] for m in w['measures']]))
-        key = ('latin', s['title']) if w.get('fixed') and s['folder'] in ('latin', 'african') else \
+        key = ('latin', s['title']) if w.get('fixed') and s['folder'] in ('latin', 'african', 'caribbean') else \
             ('fixed',) + rkey if w.get('fixed') else rkey
         skey = (s['title'], s['composer'], s['folder'])
         if skey not in src_index:

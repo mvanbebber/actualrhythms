@@ -9,7 +9,9 @@ fmt = lambda n: f'{n:,}'
 
 # genre identity colors: the validated categorical palette, in its fixed order
 GC = {'folk': '#2a78d6', 'chorale': '#eb6834', 'classical': '#1baf7a', 'ragtime': '#eda100',
-      'jazz': '#e87ba4', 'popular': '#008300', 'latin': '#6250d6', 'african': '#e34948'}
+      'jazz': '#e87ba4', 'popular': '#008300', 'latin': '#6250d6', 'african': '#e34948',
+      # a ninth genre gets no generated hue: it takes the neutral "other" gray (every row is labeled)
+      'caribbean': '#898781'}
 G = st['genres']
 GL = {g['g']: g['label'] for g in G}
 
@@ -328,7 +330,7 @@ thead th {{ font-size: 12px; color: var(--muted); font-weight: 600; }}
     </div>
   </section>
 
-  <p class="foot">Counted from the Actual Rhythms corpus: the music21 corpus, Craig Stuart Sapp's edition of Joplin's rags, OpenEWLD lead sheets, the Weimar Jazz Database, the Essen, O'Neill, Ryan and Aird collections, Michael Van Bebber's jazz and song transcriptions and <em>Charlie Parker 60 Melodies and Solos</em>, the African drum archives (IEMP Malian Jembe, Djembe Gorilla, Djembe-L, Djembe N E T), the IEMP candombe and Cuban son recordings, the Groove MIDI Dataset's Latin and African grooves, and African and Latin American songs from PDMX. A rhythm is two or four bars; the same rhythm in several pieces counts once. Notation drawn by the app.</p>
+  <p class="foot">Counted from the Actual Rhythms corpus: the music21 corpus, Craig Stuart Sapp's edition of Joplin's rags, OpenEWLD lead sheets, the Weimar Jazz Database, the Essen, O'Neill, Ryan and Aird collections, Michael Van Bebber's jazz and song transcriptions and <em>Charlie Parker 60 Melodies and Solos</em>, the African drum archives (IEMP Malian Jembe, Djembe Gorilla, Djembe-L, Djembe N E T), the IEMP candombe and Cuban son recordings, the Groove MIDI Dataset's Latin and African grooves, and African, Latin American and Caribbean songs from PDMX. A rhythm is two or four bars; the same rhythm in several pieces counts once. Notation drawn by the app.</p>
 </div>
 <div id="tip" hidden></div>
 <script>

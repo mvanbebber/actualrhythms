@@ -55,10 +55,8 @@ PATTERNS = [
      'Each beat is anticipated by a sixteenth: the push under samba.'),
     ('Bossa nova bass', '4/4', ['qd 8 qd 8'], 'Bass', 'Brazil', 'late 1950s', [36, 43, 43, 36],
      'Root on 1, fifth on 3, each anticipated by the eighth before.'),
-    # three more seven-stroke 12/8 bells from Toussaint's "Classification and Phylogenetic Analysis of
-    # African Ternary Rhythm Timelines" (Bridges 2003, figure 3), the Caribbean ones
-    ('Tambú', '12/8', ['q 8 8r q 8 q q 8'], 'Bell (heru)', 'Curaçao', 'traditional', [79],
-     'The iron bell of tambú, the Afro-Curaçaoan drum dance (2-2-2-1-2-2-1), as Toussaint gives it.'),
+    # more seven-stroke 12/8 bells from Toussaint's "Classification and Phylogenetic Analysis of
+    # African Ternary Rhythm Timelines" (Bridges 2003, figure 3), the Cuban ones (Tambú is below)
     ('Tonada bell', '12/8', ['q 8 q 8 q 8 8r q'], 'Bell', 'Cuba', 'traditional', [79],
      'The bell of the Cuban tonada (2-1-2-1-2-2-2), as Toussaint gives it.'),
     ('Bembé bell (second form)', '12/8', ['8 q q 8 q 8 8r q'], 'Bell', 'Cuba (West African roots)', 'traditional', [79],
@@ -124,6 +122,18 @@ def check_notation(name, meter, measure):
                 if piece[0] < piece[1] and ((piece[1] - piece[0]) % 12 or piece[0] % 12):
                     raise ValueError(f'{name} ({meter}): beat at tick {b0} has no sixteenth attacks, so "{code}" '
                                      'should be written with eighths or longer')
+
+
+# Caribbean patterns (the non-Hispanic Caribbean; Cuba, Puerto Rico and the Dominican Republic stay with
+# the Latin patterns above)
+CARIBBEAN_PATTERNS = [
+    ('Tambú', '12/8', ['q 8 8r q 8 q q 8'], 'Bell (heru)', 'Curaçao', 'traditional', [79],
+     'The iron bell of tambú, the Afro-Curaçaoan drum dance (2-2-2-1-2-2-1), as Toussaint gives it.'),
+]
+
+
+def caribbean_windows():
+    return pattern_windows(CARIBBEAN_PATTERNS, 'caribbean')
 
 
 def latin_windows():

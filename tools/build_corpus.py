@@ -865,6 +865,25 @@ def main():
                 i += 1
             m[:] = out
         return changed
+    # A 4-bar excerpt that opens with two bars of rest is the 2-bar excerpt of its last two bars
+    # (dropped if that leaves too few notes to read)
+    def trim_silent_start(w):
+        if w.get('fixed') or w['bars'] != 4:
+            return w
+        if not all(all(e[2] & FLAG_REST for e in m) for m in w['measures'][:2]):
+            return w
+        meas = w['measures'][2:]
+        flat = [e for m in meas for e in m]
+        onsets = sum(1 for k, e in enumerate(flat) if not e[2] & FLAG_REST and not (k and flat[k - 1][2] & FLAG_TIE))
+        if onsets < 3:
+            return None
+        src = dict(w['src'])
+        if src.get('bar') is not None:
+            src['bar'] += 2
+        return dict(w, bars=2, measures=meas, src=src)
+    n0 = sum(1 for w in found if w['bars'] == 4)
+    found = [t for t in (trim_silent_start(w) for w in found) if t is not None]
+    print(f'4-bar excerpts opening with two bars of rest: {n0 - sum(1 for w in found if w["bars"] == 4)} trimmed to their last two bars', file=sys.stderr)
     n_merged = sum(merge_beat_rests(w['meter'], w['measures']) for w in found if not w.get('fixed'))
     print(f'compound meters: {n_merged} beats of rest written as one dotted rest', file=sys.stderr)
 

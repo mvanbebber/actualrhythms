@@ -2,8 +2,8 @@
 Magenta, https://magenta.tensorflow.org/datasets/groove, CC BY 4.0).
 
 Ten professional drummers played the dataset on an electronic kit to a click; each performance is a MIDI file
-named for its style. This reads the grooves (not the two-second fills) in Latin American, Afro-Cuban, afrobeat
-and highlife styles, quantizes each to the sixteenth or the eighth-note triplet (whichever the playing fits
+named for its style. This reads the grooves (not the two-second fills) in Latin American, Afro-Cuban, reggae,
+calypso, afrobeat and highlife styles, quantizes each to the sixteenth or the eighth-note triplet (whichever the playing fits
 better), and splits the kit into its lines: kick, snare, cross-stick, hi-hat, ride and toms. The lines go into
 tools/latin-rhythms.json and tools/african-drums.json, spelled as notation by tools/african_drums.py.
 
@@ -41,6 +41,10 @@ STYLES = {
     'afrocuban': ('Afro-Cuban groove', 'Cuba', 'latin'),
     'afrocuban/bembe': ('Bembé', 'Cuba', 'latin'),
     'afrocuban/rhumba': ('Rumba', 'Cuba', 'latin'),
+    # Caribbean styles go with the Latin rhythms (the app has no Caribbean group)
+    'reggae': ('Reggae', 'Jamaica', 'latin'),
+    'reggae/slow': ('Reggae', 'Jamaica', 'latin'),
+    'afrocuban/calypso': ('Calypso', 'Trinidad and Tobago', 'latin'),
     'afrobeat': ('Afrobeat', 'Nigeria', 'african'),
     'highlife': ('Highlife', 'Ghana', 'african'),
 }

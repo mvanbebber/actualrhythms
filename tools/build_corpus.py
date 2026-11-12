@@ -62,6 +62,8 @@ COLLECTIONS = {
     'gorillalatin': ('Djembe Gorilla rhythm library', 'latin'),
     'djembellatin': ("Raymond's Transcriptions (Djembe-L)", 'latin'),
     'pdmxlatin': ('PDMX (Public Domain MusicXML)', 'latin'),
+    'gmdlatin': ('Groove MIDI Dataset', 'latin'),
+    'gmdafrica': ('Groove MIDI Dataset', 'african'),
 }
 
 # a credit and a link shown with a collection's name
@@ -77,9 +79,11 @@ COLLECTION_EXTRA = {
     'gorillalatin': {'credit': 'used with permission', 'url': 'https://djembegorilla.com/library/'},
     'djembellatin': {'credit': 'compiled by Bob Miller from the Djembe-L list, used with permission', 'url': 'https://bobmiller.yolasite.com/'},
     'pdmxlatin': {'credit': 'used with permission', 'url': 'https://zenodo.org/records/13763756'},
+    'gmdlatin': {'credit': 'Magenta, CC BY 4.0', 'url': 'https://magenta.tensorflow.org/datasets/groove'},
+    'gmdafrica': {'credit': 'Magenta, CC BY 4.0', 'url': 'https://magenta.tensorflow.org/datasets/groove'},
 }
-AFRICAN_FOLDERS = ('african', 'iemp', 'djembegorilla', 'djembel', 'djembenet', 'pdmxafrica')
-LATIN_FOLDERS = ('latin', 'iempcandombe', 'iempcuba', 'gorillalatin', 'djembellatin', 'pdmxlatin')
+AFRICAN_FOLDERS = ('african', 'iemp', 'djembegorilla', 'djembel', 'djembenet', 'pdmxafrica', 'gmdafrica')
+LATIN_FOLDERS = ('latin', 'iempcandombe', 'iempcuba', 'gorillalatin', 'djembellatin', 'pdmxlatin', 'gmdlatin')
 UNPITCHED_MIDI = 72
 
 

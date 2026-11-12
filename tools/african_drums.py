@@ -36,8 +36,14 @@ LATIN_KIT = (('clave', 76), ('campana', 77), ('agog', 77), ('cowbell', 77), ('bo
              ('repique', 74), ('chico', 72), ('caixa', 72), ('tamborim', 74), ('shaker', 79), ('güiro', 79))
 
 
+# drum-set lines (the Groove MIDI Dataset, tools/groove_midi.py)
+KIT_LINES = {'kick': 64, 'snare': 72, 'cross-stick': 72, 'hi-hat': 79, 'ride': 77, 'toms': 74}
+
+
 def kit_note(part, stroke):
     p = part.lower()
+    if p.startswith('drum kit: '):
+        return KIT_LINES.get(p[10:], 72)
     for name, m in PITCHED + LATIN_KIT:
         if p.startswith(name) or f' {name}' in p:
             return m

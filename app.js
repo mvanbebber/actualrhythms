@@ -795,7 +795,7 @@
   // Bass and guitar: FluidR3 GM (Frank Wen, CC BY 3.0), sampled every minor third. Drums: the
   // Salamander Drumkit (Alexander Holm, CC BY-SA 3.0), one hit per kit piece.
   const BASS_DIRS = { synth: 'synth_bass_1', electric: 'electric_bass_finger', acoustic: 'acoustic_bass' };
-  const DRUM_ARCHIVES = new Set(['iemp', 'djembegorilla', 'djembel', 'djembenet', 'iempcandombe', 'gorillalatin', 'djembellatin']);
+  const DRUM_ARCHIVES = new Set(['iemp', 'djembegorilla', 'djembel', 'djembenet', 'iempcandombe', 'gorillalatin', 'djembellatin', 'gmdlatin', 'gmdafrica']);
   function instrumentOf(occ) {
     if (!occ) return null;
     const part = occ[1] || '';
@@ -1224,7 +1224,7 @@
     const seeAll = (text) => `<button type="button" class="link-btn inline" data-action="family">${text}</button>`;
     const q = occ[4];
     const tempoLine = q ? `<p>Tempo: ${originalTempo()} BPM${current.mi.compound ? ` (dotted-${current.mi.den === 8 ? 'quarter' : 'half'} beat)` : ''}, ${
-      folder === 'wjd' ? 'the average tempo of the recording' : /^iemp/.test(folder) ? 'the tempo of the recording at this point' : 'from the metronome mark in the score'}.</p>` : '';
+      folder === 'wjd' ? 'the average tempo of the recording' : /^gmd/.test(folder) ? 'the click the drummer played to' : /^iemp/.test(folder) ? 'the tempo of the recording at this point' : 'from the metronome mark in the score'}.</p>` : '';
     // one link to the full list: this spelling's count, plus the same proportions written other ways
     const altText = alt.n ? `, and in ${alt.n} more written another way (${esc(altMeters)}) with the same proportions` : '';
     const occurs = item.n > 1 || alt.n

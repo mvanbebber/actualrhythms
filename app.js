@@ -15,7 +15,7 @@
     4: ['Sixteenths', 'Sixteenth-note grid, dotted eighth + sixteenth.'],
     5: ['Advanced', 'Triplets, 32nds, sixteenth syncopation.'],
   };
-  const GENRES = { folk: 'Folk tunes', chorale: 'Bach chorales', classical: 'Classical', ragtime: 'Ragtime', jazz: 'Jazz solos', popular: 'Pop songs', latin: 'Latin rhythms' };
+  const GENRES = { folk: 'Folk tunes', chorale: 'Bach chorales', classical: 'Classical', ragtime: 'Ragtime', jazz: 'Jazz solos', popular: 'Pop songs', latin: 'Latin rhythms', african: 'African rhythms' };
   // Accuracy modes: 'perfect' earns full credit, 'good' 75%, anything else inside the matching window 40%.
   const ACCURACY = {
     easy: { label: 'Easy', perfect: 0.110, good: 0.160, cap: 0.25 },
@@ -87,7 +87,7 @@
   function pool() {
     // Latin patterns have a fixed, natural length (1 or 2 bars) and show whatever Length is set to
     return DATA.rhythms.filter((r) => S.levels.includes(r.l) && S.meters.includes(r.m)
-      && (r.f ? S.genres.includes('latin') : S.bars.includes(r.b) && r.o.some((o) => S.genres.includes(genreOf(o)))));
+      && (r.f ? S.genres.includes(genreOf(r.o[0])) : S.bars.includes(r.b) && r.o.some((o) => S.genres.includes(genreOf(o)))));
   }
 
   // ---------- meter helpers ----------
@@ -1442,7 +1442,7 @@
   // ---------- settings component ----------
   const PRIMARY_METERS = ['2/4', '3/4', '4/4', '6/8'].filter((m) => METER_ORDER.includes(m));
   const MORE_METERS = METER_ORDER.filter((m) => !PRIMARY_METERS.includes(m));
-  const GENRE_SHORT = { folk: 'Folk', chorale: 'Bach', classical: 'Classical', ragtime: 'Ragtime', jazz: 'Jazz', popular: 'Pop', latin: 'Latin' };
+  const GENRE_SHORT = { folk: 'Folk', chorale: 'Bach', classical: 'Classical', ragtime: 'Ragtime', jazz: 'Jazz', popular: 'Pop', latin: 'Latin', african: 'African' };
 
   function toggleGroup(el, entries, key, multi, repick = true, withAll = false) {
     const changed = () => {

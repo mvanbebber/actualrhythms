@@ -120,8 +120,13 @@ def check_notation(name, meter, measure):
 
 def latin_windows():
     """One window per pattern, at its natural length (1 or 2 bars), in build_corpus's format."""
+    return pattern_windows(PATTERNS, 'latin')
+
+
+def pattern_windows(patterns, folder):
+    """Windows for a set of written-out patterns (Latin here, African in tools/african.py)."""
     out = []
-    for name, meter, bars, instrument, origin, date, pitches, note in PATTERNS:
+    for name, meter, bars, instrument, origin, date, pitches, note in patterns:
         ms = [decode(m) for m in bars]
         for m in ms:
             check_notation(name, meter, m)
@@ -139,7 +144,7 @@ def latin_windows():
                 e.append(prev)
         out.append({
             'meter': meter, 'bars': len(ms), 'measures': ms, 'fixed': True,
-            'src': {'title': name, 'composer': '', 'folder': 'latin', 'part': instrument, 'bar': None,
+            'src': {'title': name, 'composer': '', 'folder': folder, 'part': instrument, 'bar': None,
                     'origin': origin, 'date': date, 'note': note},
         })
     return out

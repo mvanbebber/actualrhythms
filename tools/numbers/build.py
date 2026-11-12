@@ -9,7 +9,7 @@ fmt = lambda n: f'{n:,}'
 
 # genre identity colors: the validated categorical palette, in its fixed order
 GC = {'folk': '#2a78d6', 'chorale': '#eb6834', 'classical': '#1baf7a', 'ragtime': '#eda100',
-      'jazz': '#e87ba4', 'popular': '#008300', 'latin': '#6250d6'}
+      'jazz': '#e87ba4', 'popular': '#008300', 'latin': '#6250d6', 'african': '#e34948'}
 G = st['genres']
 GL = {g['g']: g['label'] for g in G}
 

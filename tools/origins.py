@@ -130,7 +130,7 @@ def origin_and_date(src):
         return essen_origin(src.get('origin_raw')), date
     if folder == 'monteverdi' and src.get('date'):  # set from the book (tools/monteverdi.py)
         return src.get('origin'), src.get('date')
-    if folder in ('wjd', 'joplinrags', 'openewld', 'latin', 'parkerbook', 'mvbjazz', 'mvbsongs'):  # metadata supplied by the source itself
+    if folder in ('wjd', 'joplinrags', 'openewld', 'latin', 'african', 'parkerbook', 'mvbjazz', 'mvbsongs'):  # metadata supplied by the source itself
         return src.get('origin'), src.get('date')
     if folder in COLLECTIONS:
         return COLLECTIONS[folder]

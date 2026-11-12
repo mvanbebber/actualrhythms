@@ -51,6 +51,7 @@ COLLECTIONS = {
     'joplinrags': ("Scott Joplin's rags (Sapp edition)", 'ragtime'),
     'openewld': ('OpenEWLD lead sheets', 'popular'),
     'latin': ('Standard Latin rhythms', 'latin'),
+    'african': ('African timelines', 'african'),
 }
 
 # a credit and a link shown with a collection's name
@@ -714,6 +715,10 @@ def main():
     lw = latin.latin_windows()
     found.extend(lw)
     print(f'latin: {len(lw)} windows from {len(latin.PATTERNS)} patterns', file=sys.stderr)
+    import african  # African timelines, written out in tools/african.py
+    aw = african.african_windows()
+    found.extend(aw)
+    print(f'african: {len(aw)} windows from {len(african.PATTERNS)} patterns', file=sys.stderr)
 
     if args.wjd:
         import wjd
@@ -827,7 +832,7 @@ def main():
         if s['folder'] == 'essenFolksong':  # drop source page references: '(273), S. 583', '(Band 1), S. 11'
             s['title'] = re.sub(r'\s*\((?:Band \d+|[\d\-]+[a-z]?)\)', '', s['title'])
             s['title'] = re.sub(r',\s*S\.\s*\d+\w*\s*$', '', s['title']).strip() or s['title']
-        if s['title'].islower() and s['folder'] != 'latin':
+        if s['title'].islower() and s['folder'] not in ('latin', 'african'):
             s['title'] = string.capwords(s['title'])
         if s['folder'] in COMPOSERS:
             s['composer'] = COMPOSERS[s['folder']]
@@ -1050,7 +1055,7 @@ def main():
         if len(u['o']) < args.max_sources and all(o[0] != occ[0] for o in u['o']):
             u['o'].append(occ)
 
-    # 'Also found in' for Latin patterns: corpus excerpts whose attacks fall in the same places,
+    # 'Also found in' for the written-out patterns (Latin, African): corpus excerpts whose attacks fall in the same places,
     # however they're notated (a 1-bar pattern is compared with 2-bar excerpts, repeated)
     by_onsets = {}
     for k, u in uniq.items():

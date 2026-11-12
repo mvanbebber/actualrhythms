@@ -23,6 +23,13 @@ TRANSCRIBER_RE = re.compile(r'\b(trans(c|cribed|\.)?|arr\.?|arranged)\b', re.I)
 EXCLUDE_FILES = {'Green Dolphin Sendoff'}
 
 # staff names that don't say what the part is (file stem -> {label as built: correct label})
+# staves exported an octave away from where they sound (file stem -> {label: semitones}); the synth bass
+# lines on the Stevie Wonder transcriptions came out of Sibelius an octave high
+OCTAVE_FIXES = {
+    'Golden Lady - Stevie Wonder': {'Synth bass': -12},
+    'Boogie On Reggae Woman - Synth Bass': {'Synth bass': -12},
+}
+
 PART_FIXES = {
     'Golden Lady - Stevie Wonder': {'Synthesizer': 'Synth bass'},  # Stevie Wonder's Moog bass
 }

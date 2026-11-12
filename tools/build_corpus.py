@@ -411,7 +411,15 @@ def process_mvb(path):
                 except Exception:
                     pass
             bar_offsets = {m.number: float(m.offset) for m in part.getElementsByClass('Measure')}
+            shift = mvb.OCTAVE_FIXES.get(c['stem'], {}).get(label, 0)
             for w in extract_part(part, label, c['title'], c['composer'], c['folder']):
+                if shift:  # a staff exported in the wrong octave (tools/mvb.py)
+                    for meas in w['measures']:
+                        for e in meas:
+                            if isinstance(e[3], list):
+                                e[3] = [m + shift for m in e[3]]
+                            elif e[3]:
+                                e[3] += shift
                 bar = w['src']['bar']
                 w['src'].update({'origin': c['origin'], 'date': c['date'], 'note': c['note'],
                                  'file': os.path.basename(path), 'year': c['year']})

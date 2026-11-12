@@ -501,8 +501,8 @@
       l.setAttribute('stroke', TICK_COLOR); l.setAttribute('stroke-width', '2'); l.setAttribute('stroke-linecap', 'round');
       g.appendChild(l);
     });
-    // label each lane at the left edge of every row
-    layout.rows.forEach((row) => {
+    // label each lane at the left edge of every row (not on phones, where the space is too tight for them)
+    if (!/^phone/.test(root.dataset.layout)) layout.rows.forEach((row) => {
       for (let pass = 0; pass < reps(); pass++) {
         const t = document.createElementNS(NS, 'text');
         t.setAttribute('x', 3); t.setAttribute('y', laneY(row, pass) + 3.5);

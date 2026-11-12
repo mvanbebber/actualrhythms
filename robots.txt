@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /tools/
+Disallow: /tests/
+Disallow: /audio/
+
+Sitemap: https://actualrhythms.com/sitemap.xml

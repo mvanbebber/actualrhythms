@@ -199,6 +199,30 @@
   const LANE_GAP = COMPACT ? 13 : 19;  // between lanes
   // room under the staff for one feedback lane per time through
   const rowHeight = () => ROW_H + (reps() - 2) * LANE_GAP;
+  // a row's geometry; 'tight' brings the staves closer together (phones, long excerpts) by taking room from
+  // above the staff line; the feedback lanes keep their place below it (clear of the time signature) and
+  // their spacing (the two passes' ticks stay apart)
+  function rowGeometry(tight) {
+    if (!tight) return { ROW: rowHeight(), LINE: LINE_Y, LANE: LANE_Y, GAP: LANE_GAP };
+    return { ROW: rowHeight() - 6, LINE: LINE_Y - 6, LANE: LANE_Y, GAP: LANE_GAP };
+  }
+  // vertical padding and border of the score box
+  const sheetChrome = (sheet) => {
+    const cs = getComputedStyle(sheet);
+    return ['paddingTop', 'paddingBottom', 'borderTopWidth', 'borderBottomWidth'].reduce((a, k) => a + (parseFloat(cs[k]) || 0), 0);
+  };
+  // phones (touch): the height the score may take so that everything from the score to the tap pad shows,
+  // with a strip of the source card below; 0 elsewhere
+  function phoneScoreRoom(peek) {
+    const sheet = $('score').closest('.sheet');
+    if (!COMPACT || root.dataset.layout !== 'phone') { sheet.style.maxHeight = ''; return 0; }
+    const sr = sheet.getBoundingClientRect();
+    const pr = $('pad').getBoundingClientRect();
+    if (!sr.height || !pr.height) return 0;
+    const appPad = parseFloat(getComputedStyle(document.querySelector('.app')).paddingBottom) || 0;
+    const PEEK = peek ? 64 : 8; // the source card's title line and star, and the gap above it
+    return Math.max(200, Math.floor(window.innerHeight - sr.top - (pr.bottom - sr.bottom) - PEEK - appPad - sheetChrome(sheet)));
+  }
   const INK = '#202622';
   const GRADE_COLOR = { perfect: '#1E7A4C', good: '#2563A8', off: '#B5600B', miss: '#B42318' };
   let lastRenderW = 0;
@@ -335,19 +359,52 @@
     }
     const { item, mi, flat } = current;
     const W = Math.max(240, Math.floor(host.parentElement.clientWidth || 600));
-    let s = W >= 640 ? 1.2 : 1;
-    let Wl = W / s;
-    const plan = planRows(item, Wl - 8);
-    // a single bar wider than the whole staff (very narrow screens): shrink this excerpt to fit, not below 75%
-    const widest = Math.max(...plan.rows.map((idxs) => idxs.reduce((acc, k) => acc + plan.min[k], 0)));
-    if (widest > Wl - 8) { s = Math.max(0.75, s * (Wl - 8) / widest); Wl = W / s; }
-    // still too wide: let notes sit up to 20% closer than the comfortable estimate...
-    const squeeze = widest > Wl - 8 ? Math.max(0.8, (Wl - 8) / widest) : 1;
-    // ...and beyond that, draw at the needed width and let the score box scroll sideways (never clip)
-    let canvasW = W;
-    if (widest * squeeze > Wl - 8) { canvasW = Math.ceil((widest * squeeze + 8) * s); Wl = canvasW / s; }
-    const rowH = rowHeight();
+    const fit = (scale) => {
+      let s = scale;
+      let Wl = W / s;
+      const plan = planRows(item, Wl - 8);
+      // a single bar wider than the whole staff (very narrow screens): let notes sit up to 20% closer than the
+      // comfortable estimate (25% on phones), then shrink the excerpt to fit, not below 75% (55% on phones,
+      // where a bar of sixteenths or thirty-seconds would otherwise run off the screen)
+      const widest = Math.max(...plan.rows.map((idxs) => idxs.reduce((acc, k) => acc + plan.min[k], 0)));
+      const phone = COMPACT && root.dataset.layout === 'phone';
+      if (widest > Wl - 8) {
+        s = phone ? Math.max(0.55, Math.min(s, W / (widest * 0.75 + 8))) : Math.max(0.75, s * (Wl - 8) / widest);
+        Wl = W / s;
+      }
+      const squeeze = widest > Wl - 8 ? Math.max(phone ? 0.75 : 0.8, (Wl - 8) / widest) : 1;
+      // ...and beyond that, draw at the needed width and let the score box scroll sideways (never clip)
+      let canvasW = W;
+      if (widest * squeeze > Wl - 8) { canvasW = Math.ceil((widest * squeeze + 8) * s); Wl = canvasW / s; }
+      return { s, Wl, plan, squeeze, canvasW };
+    };
     const TOP_PAD = COMPACT ? 6 : 0; // the first line has nothing above it to borrow room from
+    const base = W >= 640 ? 1.2 : 1;
+    let f = fit(base);
+    let geo = rowGeometry(false);
+    // Phones: the whole excerpt shows without scrolling. The score box grows into the source card's room
+    // (the card keeps a strip and scrolls); if that isn't enough, the staves move closer together, and
+    // then the notation shrinks a little (to 80%), which can also fit two bars on a line.
+    const tall = (ff, g) => (ff.plan.rows.length * g.ROW + TOP_PAD) * ff.s;
+    let room = phoneScoreRoom(true);
+    if (room) {
+      // smaller and smaller, in 5% steps, until it fits (a smaller scale can also put two bars on a line)
+      const shrinkTo = (r, lowest) => {
+        if (tall(f, geo) > r) geo = rowGeometry(true);
+        for (let k = 1; tall(f, geo) > r && base * (1 - 0.05 * k) >= lowest - 1e-9; k++) {
+          const smaller = fit(Math.min(f.s, base * (1 - 0.05 * k)));
+          if (tall(smaller, geo) < tall(f, geo)) f = smaller;
+        }
+      };
+      shrinkTo(room, 0.8);
+      // a small phone: the source card's strip gives way too, and the notation may go down to 70%
+      if (tall(f, geo) > room) { room = phoneScoreRoom(false); shrinkTo(room, 0.7); }
+      const sheet = host.closest('.sheet');
+      sheet.style.maxHeight = Math.max(244, Math.min(room, Math.ceil(tall(f, geo))) + sheetChrome(sheet)) + 'px';
+    }
+    let { s, Wl } = f;
+    const { plan, squeeze, canvasW } = f;
+    const rowH = geo.ROW;
     const H = plan.rows.length * rowH + TOP_PAD;
     const renderer = new VF.Renderer(host, VF.Renderer.Backends.SVG);
     renderer.resize(canvasW, Math.ceil(H * s));
@@ -362,10 +419,10 @@
     const rowOfMeasure = [];
     plan.rows.forEach((idxs, r) => {
       const rowTop = r * rowH + TOP_PAD;
-      const y = rowTop + LINE_Y - 40; // stave line sits 40px below the stave's y (4 spaces of headroom)
+      const y = rowTop + geo.LINE - 40; // stave line sits 40px below the stave's y (4 spaces of headroom)
       const sum = idxs.reduce((acc, k) => acc + plan.min[k] * squeeze, 0);
       const spare = Math.max(0, Wl - 8 - sum);
-      const rowInfo = { y: rowTop, top: rowTop + 14, height: 62, line: rowTop + LINE_Y, segs: [] };
+      const rowInfo = { y: rowTop, top: rowTop + geo.LINE - 34, height: rowH - 32, line: rowTop + geo.LINE, segs: [] };
       let x = 4;
       idxs.forEach((mIdx, k) => {
         rowOfMeasure[mIdx] = r;
@@ -400,7 +457,7 @@
       const mk = (a, b) => new VF.StaveTie({ first_note: a, last_note: b, first_indices: [0], last_indices: [0] }).setContext(ctx).draw();
       if (rowOfMeasure[ev.mi] === rowOfMeasure[nx.mi]) mk(ev.vf, nx.vf); else { mk(ev.vf, null); mk(null, nx.vf); }
     });
-    layout = { rows: rowsInfo, svg, s, W };
+    layout = { rows: rowsInfo, svg, s, W, geo };
     lastRenderW = W;
     if (lastResult) drawTapMarks();
   }
@@ -434,7 +491,7 @@
     const NS = 'http://www.w3.org/2000/svg';
     const g = document.createElementNS(NS, 'g');
     const total = current.flat.total;
-    const laneY = (row, pass) => row.line + LANE_Y + pass * LANE_GAP;
+    const laneY = (row, pass) => row.line + layout.geo.LANE + pass * layout.geo.GAP;
     lastResult.onsets.forEach((o) => {
       const p = tickToXY(o.tick - o.pass * total);
       if (!p) return;

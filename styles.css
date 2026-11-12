@@ -585,3 +585,9 @@ html[data-layout="phone"] .pool-note, html[data-layout="phone-landscape"] .pool-
 .corpus.fav-mode #corpusSort, .corpus.fav-mode .corpus-only { display: none; }
 .c-fav { display: inline-flex; align-items: center; gap: 4px; color: var(--star); }
 .c-fav .icon { width: 14px; height: 14px; }
+
+/* short phones (iPhone SE and the like): a slimmer tap pad, so a 4-bar excerpt shows whole above it */
+@media (max-height: 600px) {
+  html[data-touch][data-layout="phone"] .pad { min-height: 64px; }
+  html[data-touch][data-layout="phone"] .pad-icon { display: none; }
+}

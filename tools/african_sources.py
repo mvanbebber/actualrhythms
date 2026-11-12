@@ -82,13 +82,14 @@ def _text(s):
     return re.sub(r'\s+', ' ', html.unescape(re.sub(r'<[^>]+>', ' ', s))).strip()
 
 
-def gorilla_lines(d):
+def gorilla_lines(d, region='africa', folder='djembegorilla'):
+    """Rhythms tagged with the region (africa, or america for tools/latin_sources.py)."""
     out = []
     for f in sorted(glob.glob(os.path.join(d, '*.html'))):
         t = open(f, encoding='utf-8').read()
         head = t[:t.find('patterns_section')] if 'patterns_section' in t else t
-        origins = sorted(set(re.findall(r'origin-([\w-]+)', head)) - {'africa', 'link'})
-        if 'origin-africa' not in head:
+        origins = sorted(set(re.findall(r'origin-([\w-]+)', head)) - {region, 'link'})
+        if f'origin-{region}' not in head:
             continue
         sig = re.search(r'tv_show_time-signature-([\w-]+)', t)
         if not sig or sig.group(1) not in GORILLA_PULSES:
@@ -118,7 +119,7 @@ def gorilla_lines(d):
             if (part, cells) in seen or cells.count('.') == len(cells):
                 continue
             seen.add((part, cells))
-            out.append({'folder': 'djembegorilla', 'title': title, 'composer': '', 'part': part,
+            out.append({'folder': folder, 'title': title, 'composer': '', 'part': part,
                         'meter': meter, 'slots': slots, 'grid': cells, 'loop': True,
                         'origin': origin, 'date': 'traditional', 'note': note})
     return out
@@ -246,7 +247,8 @@ def _part_name(label, group, prev, cells):
     return name
 
 
-def djembel_lines(path):
+def djembel_lines(path, keep=None, folder='djembel'):
+    """keep: a pattern of the titles to read instead (the Latin ones, for tools/latin_sources.py)."""
     text = open(path, encoding='utf-8', errors='replace').read()
     text = html.unescape(re.sub(r'<br\s*/?>', '\n', text, flags=re.I))
     text = re.sub(r'<[^>]+>', '', text).replace('\xa0', ' ')
@@ -261,7 +263,7 @@ def djembel_lines(path):
             if not DJEMBEL_SUBHEADS.match(h):
                 title, count, group, prev = h, None, '', ''
             continue
-        if not title or DJEMBEL_SKIP.search(title):
+        if not title or (not re.search(keep, title) if keep else DJEMBEL_SKIP.search(title)):
             continue
         c = _count_line(line)
         if c:
@@ -307,7 +309,7 @@ def djembel_lines(path):
         if key in seen or grid.count('.') == len(grid):
             continue
         seen.add(key)
-        out.append({'folder': 'djembel', 'title': name, 'composer': '', 'part': part, 'meter': meter,
+        out.append({'folder': folder, 'title': name, 'composer': '', 'part': part, 'meter': meter,
                     'slots': per_bar, 'grid': grid, 'loop': True,
                     'origin': DJEMBEL_ORIGIN.get(title.split(' (')[0]), 'date': 'traditional', 'note': None})
     return out

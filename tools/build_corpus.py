@@ -57,6 +57,11 @@ COLLECTIONS = {
     'djembel': ("Raymond's Transcriptions (Djembe-L)", 'african'),
     'djembenet': ('Djembe N E T', 'african'),
     'pdmxafrica': ('PDMX (Public Domain MusicXML)', 'african'),
+    'iempcandombe': ('IEMP Uruguayan Candombe recordings', 'latin'),
+    'iempcuba': ('IEMP Cuban Son & Salsa recordings', 'latin'),
+    'gorillalatin': ('Djembe Gorilla rhythm library', 'latin'),
+    'djembellatin': ("Raymond's Transcriptions (Djembe-L)", 'latin'),
+    'pdmxlatin': ('PDMX (Public Domain MusicXML)', 'latin'),
 }
 
 # a credit and a link shown with a collection's name
@@ -67,8 +72,14 @@ COLLECTION_EXTRA = {
     'djembel': {'credit': 'compiled by Bob Miller from the Djembe-L list, used with permission', 'url': 'https://bobmiller.yolasite.com/'},
     'djembenet': {'credit': 'used with permission', 'url': 'https://www.djembe.net/'},
     'pdmxafrica': {'credit': 'used with permission', 'url': 'https://zenodo.org/records/13763756'},
+    'iempcandombe': {'credit': 'Jure, Rocamora, Tarsitani & Clayton, used with permission', 'url': 'https://doi.org/10.17605/OSF.IO/WFX7K'},
+    'iempcuba': {'credit': 'Poole, Tarsitani & Clayton, used with permission', 'url': 'https://doi.org/10.17605/OSF.IO/SFXA2'},
+    'gorillalatin': {'credit': 'used with permission', 'url': 'https://djembegorilla.com/library/'},
+    'djembellatin': {'credit': 'compiled by Bob Miller from the Djembe-L list, used with permission', 'url': 'https://bobmiller.yolasite.com/'},
+    'pdmxlatin': {'credit': 'used with permission', 'url': 'https://zenodo.org/records/13763756'},
 }
 AFRICAN_FOLDERS = ('african', 'iemp', 'djembegorilla', 'djembel', 'djembenet', 'pdmxafrica')
+LATIN_FOLDERS = ('latin', 'iempcandombe', 'iempcuba', 'gorillalatin', 'djembellatin', 'pdmxlatin')
 UNPITCHED_MIDI = 72
 
 
@@ -680,6 +691,8 @@ def main():
                     help="MusicXML exports of Michael Van Bebber's transcriptions (used with permission)")
     ap.add_argument('--pdmx-african', metavar='DIR',
                     help='.mxl files of the African scores listed in tools/pdmx_african.py, named by PDMX hash')
+    ap.add_argument('--pdmx-latin', metavar='DIR',
+                    help='JSON files of the Latin American scores listed in tools/pdmx_latin.py, named by PDMX hash')
     ap.add_argument('--wjd', metavar='DIR',
                     help="jazzodata's data/ folder (git clone https://github.com/klausfrieler/jazzodata); adds jazz solos")
     args = ap.parse_args()
@@ -737,28 +750,34 @@ def main():
     aw = african.african_windows()
     found.extend(aw)
     print(f'african: {len(aw)} windows from {len(african.PATTERNS)} patterns', file=sys.stderr)
-    # African songs from PDMX: parsed with --pdmx-african, otherwise read from the saved excerpts
+    # African and Latin songs from PDMX: parsed with --pdmx-african / --pdmx-latin, otherwise read from the
+    # saved excerpts
     import pdmx_african
-    pdmx_cache = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pdmx-african-windows.json')
-    if args.pdmx_african:
-        pw = []
-        with Pool(args.jobs) as pool:
-            for res in pool.imap_unordered(process_file, list(pdmx_african.jobs(args.pdmx_african))):
-                pw.extend(res)
-        pw.sort(key=lambda w: (w['src']['title'], w['src']['part'], w['src']['bar'], w['bars']))
-        with open(pdmx_cache, 'w') as f:
-            json.dump(pw, f, separators=(',', ':'), ensure_ascii=False)
-    elif os.path.exists(pdmx_cache):
-        with open(pdmx_cache) as f:
-            pw = json.load(f)
-    else:
-        pw = []
-    found.extend(pw)
-    print(f'pdmx african: {len(pw)} windows', file=sys.stderr)
+    import pdmx_latin
+    for mod, arg, name in ((pdmx_african, args.pdmx_african, 'african'), (pdmx_latin, args.pdmx_latin, 'latin')):
+        cache = os.path.join(os.path.dirname(os.path.abspath(__file__)), f'pdmx-{name}-windows.json')
+        if arg:
+            pw = []
+            with Pool(args.jobs) as pool:
+                for res in pool.imap_unordered(process_file, list(mod.jobs(arg))):
+                    pw.extend(res)
+            pw.sort(key=lambda w: (w['src']['title'], w['src']['part'], w['src']['bar'], w['bars']))
+            with open(cache, 'w') as f:
+                json.dump(pw, f, separators=(',', ':'), ensure_ascii=False)
+        elif os.path.exists(cache):
+            with open(cache) as f:
+                pw = json.load(f)
+        else:
+            pw = []
+        found.extend(pw)
+        print(f'pdmx {name}: {len(pw)} windows', file=sys.stderr)
     import african_drums  # African drum rhythms: tools/african-drums.json (tools/african_sources.py)
     dw = african_drums.drum_windows(windows_from_bars)
     found.extend(dw)
     print(f'african drums: {len(dw)} windows', file=sys.stderr)
+    lw2 = african_drums.drum_windows(windows_from_bars, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'latin-rhythms.json'))
+    found.extend(lw2)
+    print(f'latin recordings and drum archives: {len(lw2)} windows', file=sys.stderr)
 
     if args.wjd:
         import wjd
@@ -872,7 +891,7 @@ def main():
         if s['folder'] == 'essenFolksong':  # drop source page references: '(273), S. 583', '(Band 1), S. 11'
             s['title'] = re.sub(r'\s*\((?:Band \d+|[\d\-]+[a-z]?)\)', '', s['title'])
             s['title'] = re.sub(r',\s*S\.\s*\d+\w*\s*$', '', s['title']).strip() or s['title']
-        if s['title'].islower() and s['folder'] not in ('latin',) + AFRICAN_FOLDERS:
+        if s['title'].islower() and s['folder'] not in LATIN_FOLDERS + AFRICAN_FOLDERS:
             s['title'] = string.capwords(s['title'])
         if s['folder'] in COMPOSERS:
             s['composer'] = COMPOSERS[s['folder']]

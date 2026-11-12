@@ -55,6 +55,14 @@ PATTERNS = [
      'Each beat is anticipated by a sixteenth: the push under samba.'),
     ('Bossa nova bass', '4/4', ['qd 8 qd 8'], 'Bass', 'Brazil', 'late 1950s', [36, 43, 43, 36],
      'Root on 1, fifth on 3, each anticipated by the eighth before.'),
+    # three more seven-stroke 12/8 bells from Toussaint's "Classification and Phylogenetic Analysis of
+    # African Ternary Rhythm Timelines" (Bridges 2003, figure 3), the Caribbean ones
+    ('Tambú', '12/8', ['q 8 8r q 8 q q 8'], 'Bell (heru)', 'Curaçao', 'traditional', [79],
+     'The iron bell of tambú, the Afro-Curaçaoan drum dance (2-2-2-1-2-2-1), as Toussaint gives it.'),
+    ('Tonada bell', '12/8', ['q 8 q 8 q 8 8r q'], 'Bell', 'Cuba', 'traditional', [79],
+     'The bell of the Cuban tonada (2-1-2-1-2-2-2), as Toussaint gives it.'),
+    ('Bembé bell (second form)', '12/8', ['8 q q 8 q 8 8r q'], 'Bell', 'Cuba (West African roots)', 'traditional', [79],
+     'A second Afro-Cuban bembé bell (1-2-2-1-2-2-2), as Toussaint gives it.'),
     ('Sesquialtera', '6/8', ['qd qd', 'q 8~ 8 q'], 'Guitar, bombo, harp', 'Mexico, Argentina, Venezuela (Spanish roots)', 'traditional',
      [55, 60, 55, 59, 62], 'Two beats of 6/8 against three of 3/4: the hemiola of huapango, chacarera and joropo.'),
 ]

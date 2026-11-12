@@ -28,8 +28,19 @@ DATA = os.path.join(HERE, 'african-drums.json')
 STROKES = {'B': 69, 'T': 74, 'S': 72}  # jembe and hand drums: bass, tone, slap
 
 
+# Latin parts: pitched lines with only their attacks annotated (IEMP Cuban Son & Salsa) get one pitch each;
+# percussion goes on the kit
+PITCHED = (('bass', 43), ('guitar', 55), ('tres', 67), ('trumpet', 72))
+LATIN_KIT = (('clave', 76), ('campana', 77), ('agog', 77), ('cowbell', 77), ('bongó', 74), ('bongo', 74),
+             ('conga', 69), ('tumbadora', 69), ('cajón', 64), ('cajon', 64), ('surdo', 64), ('piano (drum)', 64),
+             ('repique', 74), ('chico', 72), ('caixa', 72), ('tamborim', 74), ('shaker', 79), ('güiro', 79))
+
+
 def kit_note(part, stroke):
     p = part.lower()
+    for name, m in PITCHED + LATIN_KIT:
+        if p.startswith(name) or f' {name}' in p:
+            return m
     if 'bell' in p:
         return 77
     if 'dununba' in p or 'doundounba' in p or p.startswith('dundun 1') or p.startswith('dun dun'):
@@ -121,11 +132,12 @@ def bar_events(name, meter, cells, part):
     return m
 
 
-def drum_windows(windows_from_bars):
-    """Every line in african-drums.json as build_corpus windows (windows_from_bars cuts long lines)."""
-    if not os.path.exists(DATA):
+def drum_windows(windows_from_bars, path=DATA):
+    """Every line in african-drums.json (or tools/latin-rhythms.json) as build_corpus windows
+    (windows_from_bars cuts long lines)."""
+    if not os.path.exists(path):
         return []
-    with open(DATA) as f:
+    with open(path) as f:
         lines = json.load(f)
     out = []
     for ln in lines:

@@ -78,11 +78,12 @@ kbd {
 .wordmark { font: 400 22px/1.15 var(--font-serif); letter-spacing: -0.01em; }
 .today { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
 /* links to the landing pages, under the practice column */
+.page-about { margin: var(--s3) 0 0; max-width: 72ch; font-size: 14px; line-height: 1.5; color: var(--muted); }
 .page-links { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: var(--s2) 0 var(--s4); font-size: 14px; }
 .page-links a { color: var(--muted); }
 .page-links a:hover { color: inherit; }
 /* a landscape phone has no height to spare: the links are in Settings, under About */
-html[data-layout="phone-landscape"] .page-links { display: none; }
+html[data-layout="phone-landscape"] .page-links, html[data-layout^="phone"] .page-about { display: none; }
 
 .workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s5); align-items: start; }
 .practice { display: flex; flex-direction: column; gap: var(--s4); min-width: 0; }

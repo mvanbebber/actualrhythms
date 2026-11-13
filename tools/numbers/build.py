@@ -448,4 +448,7 @@ site = f'''<!doctype html>
 '''
 os.makedirs(f'{SITE}/numbers', exist_ok=True)
 open(f'{SITE}/numbers/index.html', 'w').write(site)
+# structured data and the sitemap date (tools/seo.py)
+import subprocess, sys
+subprocess.run([sys.executable, os.path.join(SITE, 'tools', 'seo.py')], check=True)
 print('site page written', len(site))

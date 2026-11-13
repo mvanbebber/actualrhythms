@@ -1344,6 +1344,8 @@
     $('btnPlay').disabled = !current || phase === 'calibrating';
     setBtn($('btnListen'), 'speaker', loadingMode ? 'Loading…' : 'Listen', 'L');
     $('btnListen').disabled = phase !== 'idle' || !current || !!loadingMode;
+    setBtn($('btnPrev'), 'prev', 'Previous', '←');
+    $('btnPrev').disabled = phase === 'calibrating' || seenPos <= 0;
     setBtn($('btnNext'), 'next', 'Next', '→', true);
     $('btnNext').disabled = phase === 'calibrating';
     $('btnCalib').disabled = phase !== 'idle';
@@ -2045,6 +2047,7 @@
     setupTempo();
     $('btnPlay').addEventListener('click', () => (run ? stopRun() : startRun('play')));
     $('btnListen').addEventListener('click', () => startRun('listen'));
+    $('btnPrev').addEventListener('click', () => { if (run) stopRun(true); stepHistory(-1); setButtons(); });
     $('btnNext').addEventListener('click', () => { if (run) stopRun(true); stepHistory(1); setButtons(); });
     $('btnSettings').addEventListener('click', openSettings);
     $('btnCloseSettings').addEventListener('click', () => closeSettings());

@@ -149,7 +149,7 @@ html[data-layout="phone-landscape"] .page-links { display: none; }
 .controls { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
 .transport { display: flex; gap: var(--s2); flex-wrap: wrap; }
 .tempo { display: flex; align-items: center; gap: var(--s2); }
-.tempo-slider { width: 200px; height: var(--control-h); margin: 0; accent-color: var(--teal); cursor: pointer; touch-action: pan-x; }
+.tempo-slider { width: 160px; height: var(--control-h); margin: 0; accent-color: var(--teal); cursor: pointer; touch-action: pan-x; }
 .tempo-value {
   min-height: var(--control-h); min-width: 84px; padding: 0 var(--s3);
   border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface);
@@ -343,6 +343,16 @@ html[data-layout="phone"] .tempo { order: -1; justify-content: center; }
 html[data-layout="phone"] .transport { flex-wrap: nowrap; }
 html[data-layout="phone"] .transport .btn { flex: 1 1 0; min-width: 0; padding: 0 var(--s2); }
 html[data-layout="phone"] .transport .btn-primary { flex-grow: 1.3; }
+/* four buttons on a phone: Previous shows only its arrow */
+html[data-layout="phone"] #btnPrev, html[data-layout="phone-landscape"] #btnPrev { flex: 0 0 44px; width: 44px; padding: 0; }
+html[data-layout="phone"] #btnPrev span, html[data-layout="phone-landscape"] #btnPrev span { display: none; }
+/* landscape phones and the narrowest phones: Listen shows only its speaker too */
+html[data-layout="phone-landscape"] #btnListen { flex: 0 0 44px; width: 44px; padding: 0; }
+html[data-layout="phone-landscape"] #btnListen span { display: none; }
+@media (max-width: 360px) {
+  html[data-layout="phone"] #btnListen { flex: 0 0 44px; padding: 0; }
+  html[data-layout="phone"] #btnListen span { display: none; }
+}
 html[data-layout="phone"] .pad { min-height: 120px; }
 html[data-layout="phone"] .settings {
   left: 0; right: 0; bottom: 0; top: auto;
@@ -372,7 +382,7 @@ html[data-layout="phone-landscape"] .score-col { gap: var(--s2); }
 html[data-layout="phone-landscape"] .sheet { padding: 4px var(--s2); }
 html[data-layout="phone-landscape"] .controls { gap: var(--s2); flex-wrap: nowrap; }
 html[data-layout="phone-landscape"] .transport { flex-wrap: nowrap; }
-html[data-layout="phone-landscape"] .transport .btn { padding: 0 var(--s3); }
+html[data-layout="phone-landscape"] .transport .btn { padding: 0 10px; }
 html[data-layout="phone-landscape"] .tempo { margin-left: auto; padding-left: var(--s3); border-left: 1px solid var(--border); }
 html[data-layout="phone-landscape"] .tempo-beat { display: none; }
 html[data-layout="phone-landscape"] .pad {

@@ -39,7 +39,7 @@
   // touch devices (phones, iPads, including iPads with a keyboard or trackpad) get the locked, no-scroll page
   if (navigator.maxTouchPoints > 0 || 'ontouchstart' in window) document.documentElement.dataset.touch = '';
 </script>
-<link rel="stylesheet" href="styles.css?v=40">
+<link rel="stylesheet" href="styles.css?v=41">
 <script type="application/ld+json">
 {
  "@context": "https://schema.org",
@@ -87,6 +87,7 @@
     <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="1.5" fill="currentColor"/></symbol>
     <symbol id="i-speaker" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.8 7.8 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
     <symbol id="i-next" viewBox="0 0 24 24"><path d="M9.5 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-prev" viewBox="0 0 24 24"><path d="M14.5 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-minus" viewBox="0 0 24 24"><path d="M6 12h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
     <symbol id="i-plus" viewBox="0 0 24 24"><path d="M6 12h12M12 6v12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
     <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="15" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="12" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="17" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
@@ -129,8 +130,9 @@
           <div class="controls">
             <div class="transport">
               <button class="btn btn-primary" id="btnPlay" type="button"></button>
-              <button class="btn" id="btnListen" type="button"></button>
-              <button class="btn" id="btnNext" type="button" title="Left arrow goes back to earlier rhythms"></button>
+              <button class="btn" id="btnListen" type="button" aria-label="Listen to this rhythm"></button>
+              <button class="btn" id="btnPrev" type="button" aria-label="Previous rhythm" title="The rhythm before this one"></button>
+              <button class="btn" id="btnNext" type="button" aria-label="Next rhythm" title="A new rhythm"></button>
             </div>
             <div class="tempo" id="tempoGroup" role="group" aria-label="Tempo">
               <input type="range" id="tempoSlider" class="tempo-slider" min="40" max="200" step="2" aria-label="Tempo, beats per minute" aria-describedby="tempoBeat">
@@ -287,6 +289,6 @@
 
 <script src="vendor/vexflow.js"></script>
 <script src="data/rhythms.js?v=0e33a8ef6b"></script>
-<script src="app.js?v=56"></script>
+<script src="app.js?v=57"></script>
 </body>
 </html>

@@ -1269,14 +1269,17 @@
     </div>`;
   }
 
+  // the links to the landing pages; on phones they sit at the foot of this card, below the result and the
+  // source, so they're reached only by scrolling down (CSS shows one copy or the other)
+  const PAGE_LINKS = `<nav class="page-links card-links" aria-label="More pages">${document.querySelector('.page-links').innerHTML}</nav>`;
   function renderOutcome() {
     const box = $('outcome');
     if (!current) { box.innerHTML = ''; return; }
     let html = lastResult ? resultHTML() : '';
     if (S.hideSource && !lastResult) {
-      html += `<details class="locked"><summary>${icon('lock')}<span class="grow">Play to discover the music</span>${icon('chevron', 'chev')}</summary>${sourceInner()}</details>`;
+      html += `<details class="locked"><summary>${icon('lock')}<span class="grow">Play to discover the music</span>${icon('chevron', 'chev')}</summary>${sourceInner()}</details>${PAGE_LINKS}`;
     } else {
-      html += `<div class="card">${sourceInner()}</div>`;
+      html += `<div class="card">${sourceInner()}${PAGE_LINKS}</div>`;
     }
     box.innerHTML = html;
   }

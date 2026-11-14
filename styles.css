@@ -83,7 +83,11 @@ kbd {
 .page-links a { color: var(--muted); }
 .page-links a:hover { color: inherit; }
 /* a landscape phone has no height to spare: the links are in Settings, under About */
-html[data-layout="phone-landscape"] .page-links, html[data-layout^="phone"] .page-about { display: none; }
+/* phones: the links move to the foot of the result and source card (app.js), below what matters there */
+.card-links { display: none; }
+html[data-layout^="phone"] .page-links { display: none; }
+html[data-layout^="phone"] .card-links { display: flex; margin-top: var(--s4); padding: var(--s3) 0 0; border-top: 1px solid var(--border); }
+html[data-layout^="phone"] .page-about { display: none; }
 
 .workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s5); align-items: start; }
 .practice { display: flex; flex-direction: column; gap: var(--s4); min-width: 0; }

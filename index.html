@@ -180,6 +180,22 @@
           <p class="help" id="accuracyHelp"></p>
         </fieldset>
         <fieldset>
+          <legend>Listening on</legend>
+          <div class="seg" id="outputs"></div>
+          <p class="help" id="outputAuto" aria-live="polite"></p>
+          <div class="calib">
+            <div class="calib-row">
+              <label for="latency">Offset</label>
+              <input id="latency" type="number" step="5" min="-300" max="500" inputmode="numeric"> <span class="help">ms</span>
+              <button class="btn" id="btnCalib" type="button">Calibrate</button>
+            </div>
+            <span id="latencyFor" hidden></span>
+            <button class="calib-pad" id="calibPad" type="button" hidden>Tap with the clicks</button>
+            <p class="calib-msg" id="calibMsg" aria-live="polite"></p>
+            <p class="calib-warn" id="calibWarn"></p>
+          </div>
+        </fieldset>
+        <fieldset>
           <legend>Length</legend>
           <div class="seg" id="lengths"></div>
         </fieldset>
@@ -196,22 +212,6 @@
           <span id="metroLabel">Metronome</span>
           <button class="switch" id="metro" type="button" role="switch" aria-labelledby="metroLabel"></button>
         </div>
-        <fieldset>
-          <legend>Listening on</legend>
-          <div class="seg" id="outputs"></div>
-          <p class="help" id="outputAuto" aria-live="polite"></p>
-          <div class="calib">
-            <div class="calib-row">
-              <label for="latency">Offset</label>
-              <input id="latency" type="number" step="5" min="-300" max="500" inputmode="numeric"> <span class="help">ms</span>
-              <button class="btn" id="btnCalib" type="button">Calibrate</button>
-            </div>
-            <span id="latencyFor" hidden></span>
-            <button class="calib-pad" id="calibPad" type="button" hidden>Tap with the clicks</button>
-            <p class="calib-msg" id="calibMsg" aria-live="polite"></p>
-            <p class="calib-warn" id="calibWarn"></p>
-          </div>
-        </fieldset>
         <details class="disclosure" id="advanced">
           <summary>More<svg class="icon chev" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
           <div class="advanced-body">

@@ -88,6 +88,11 @@ kbd {
 html[data-layout^="phone"] .page-links { display: none; }
 html[data-layout^="phone"] .card-links { display: flex; margin-top: var(--s4); padding: var(--s3) 0 0; border-top: 1px solid var(--border); }
 html[data-layout^="phone"] .page-about { display: none; }
+/* the credit line (written by tools/seo.py): under the page links, and on phones at the foot of the card */
+.made-by { margin: 0 0 var(--s4); font-size: 12px; line-height: 1.5; color: var(--muted); }
+.card-made-by { display: none; }
+html[data-layout^="phone"] .made-by { display: none; }
+html[data-layout^="phone"] .card-made-by { display: block; margin: var(--s2) 0 0; }
 
 .workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s5); align-items: start; }
 .practice { display: flex; flex-direction: column; gap: var(--s4); min-width: 0; }

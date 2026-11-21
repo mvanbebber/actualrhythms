@@ -1271,7 +1271,8 @@
 
   // the links to the landing pages; on phones they sit at the foot of this card, below the result and the
   // source, so they're reached only by scrolling down (CSS shows one copy or the other)
-  const PAGE_LINKS = `<nav class="page-links card-links" aria-label="More pages">${document.querySelector('.page-links').innerHTML}</nav>`;
+  const PAGE_LINKS = `<nav class="page-links card-links" aria-label="More pages">${document.querySelector('.page-links').innerHTML}</nav>`
+    + `<p class="made-by card-made-by">${document.querySelector('.made-by').innerHTML}</p>`;
   function renderOutcome() {
     const box = $('outcome');
     if (!current) { box.innerHTML = ''; return; }

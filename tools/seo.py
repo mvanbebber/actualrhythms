@@ -1,4 +1,8 @@
-"""Search-engine housekeeping for the landing pages: structured data (schema.org JSON-LD) and the sitemap.
+"""Site housekeeping: the credit line on every page, structured data (schema.org JSON-LD) and the sitemap.
+
+The credit line ("Developed by Michael Van Bebber · Version … · ©") is written into a <p class="made-by"> on
+every page, with the version from the VERSION file at the site root: to release a new version, edit VERSION
+and run this script.
 
 Each landing page gets a WebPage and a BreadcrumbList (Actual Rhythms > the page), built from the page's own
 title, description and social image, in a <script id="ld"> block that is replaced on every run. The app page
@@ -61,6 +65,33 @@ def structured_data():
         open(path, 'w', encoding='utf-8').write(s)
 
 
+CREDIT_PAGES = ['index.html', '404.html'] + [f'{p}/index.html' for p in PAGES]
+
+
+def credit_line():
+    version = open(os.path.join(SITE, 'VERSION')).read().strip()
+    year = datetime.date.today().year
+    years = '2026' if year == 2026 else f'2026–{year}'
+    return (f'<p class="made-by">Developed by Michael Van Bebber · Version {version} · © {years} Michael Van Bebber. '
+            'The music belongs to its composers, performers and transcribers, credited with each rhythm.</p>')
+
+
+def credits():
+    line = credit_line()
+    for rel in CREDIT_PAGES:
+        path = os.path.join(SITE, rel)
+        s = open(path, encoding='utf-8').read()
+        if '<p class="made-by">' in s:
+            s = re.sub(r'<p class="made-by">.*?</p>', line, s, count=1, flags=re.S)
+        elif '</footer>' in s:  # landing pages: the last line of the footer
+            s = s.replace('  </div>\n</footer>', f'    {line}\n  </div>\n</footer>', 1)
+            if line not in s:
+                raise SystemExit(f'{rel}: no place for the credit line')
+        else:
+            raise SystemExit(f'{rel}: no <p class="made-by"> or footer for the credit line')
+        open(path, 'w', encoding='utf-8').write(s)
+
+
 def last_changed(path):
     """The day a file last changed: its last commit, or today if it has uncommitted changes."""
     dirty = subprocess.run(['git', 'status', '--porcelain', '--', path], cwd=SITE, capture_output=True, text=True).stdout
@@ -88,6 +119,7 @@ def sitemap():
 
 
 if __name__ == '__main__':
+    credits()
     structured_data()
     sitemap()
-    print('structured data on', len(PAGES), 'landing pages; sitemap dates updated')
+    print('credit line on', len(CREDIT_PAGES), 'pages; structured data on', len(PAGES), 'landing pages; sitemap dates updated')

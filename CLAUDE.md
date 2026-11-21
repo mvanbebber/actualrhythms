@@ -13,6 +13,9 @@
 - Playback: piano (`audio/piano/`) for every part except bass, guitar and drum parts, which use
   `audio/instruments/` (FluidR3 GM, CC BY 3.0) and `audio/drums/` (Salamander Drumkit, CC BY-SA 3.0); see `instrumentOf()` in `app.js`.
   Run `tools/instrument_offsets.py` after changing those samples.
+- Version and credit line: the version number lives in `VERSION`. `tools/seo.py` writes the line "Developed by
+  Michael Van Bebber · Version … · ©" into every page (and the structured data and sitemap dates): to release,
+  edit `VERSION` and run `python3 tools/seo.py`.
 - Landing pages: `why/`, `compare/`, `teachers/`, `jazz/`, `same-rhythm/`, `numbers/`, sharing `landing/landing.css`; their notation
   images in `landing/img/` are real excerpts exported from the app.
 - Corpus build: `tools/build_corpus.py` writes `data/rhythms.js` and `data/occurrences.js` (loaded on demand)
